@@ -2,8 +2,13 @@ void configureAllSensors(); //configures all sensors to standard configuration
 void drive(int motor_power); //powers both drive motors with the same power
 void driveBoth (int motor_power_A, int motor_power_D); //powers both motors independently
 void waitButton(TEV3Buttons button_name);  // wait for push and release of specified button
+void drivePID(int distance);
+void autoScan();
 
-int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
+float angleAtScan = 0;
+float ScanDistance = 0;
+
+int rotateRobot(int angle, int power) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
 	resetGyro(S4);
 	int lastGyro = getGyroDegrees(S4);
@@ -25,11 +30,11 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 		displayString(5, "%f",error);
 		if (angle>0)
 	{
-		driveBoth(-mPower, mPower);
+		driveBoth(-mPower*power, mPower*power);
 	}
 	else
 	{
-		driveBoth(mPower,-mPower);
+		driveBoth(mPower*power,-mPower*power);
 	}
 		//wait1Msec(100);
 		prevError = error;
@@ -71,6 +76,7 @@ void drivePID(int distance)
 task main()
 {
 
+	autoScan();
 
 
 }
@@ -110,3 +116,22 @@ void waitButton(TEV3Buttons button_name)
 	while(getButtonPress(button_name))
 	{}
 }
+void autoScan()
+{
+	float lowestDist = 0;
+	int angleAt = 0;
+	const int power = 1;
+	string output = "";
+	for(int angle = 0; angle < 360; angle++)
+	{
+	rotateRobot(angle, power);
+	float dist = SensorType[S2];
+	if (dist < lowestDist)
+	{
+		lowestDist = dist;
+		angleAt = SensorType[S4];
+	}
+	}
+	angleAtScan = angleAt;
+	ScanDistance = lowestDist;
+	}
