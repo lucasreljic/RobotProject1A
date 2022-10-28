@@ -3,10 +3,10 @@ void drive(int motor_power); //powers both drive motors with the same power
 void driveBoth (int motor_power_A, int motor_power_D); //powers both motors independently
 void waitButton(TEV3Buttons button_name);  // wait for push and release of specified button
 void drivePID(int distance);
-void autoScan();
+float autoScan();
 
-float angleAtScan = 0;
-float ScanDistance = 0;
+//Global variables cause C is stupid and won't let you return arrays
+
 
 int rotateRobot(int angle, int power) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
@@ -75,8 +75,11 @@ void drivePID(int distance)
 }
 task main()
 {
+	configureAllSensors();
+	waitButton(buttonEnter);
+	float ScanDistance = autoScan();
+	drivePID(ScanDistance);
 
-	autoScan();
 
 
 }
@@ -116,12 +119,11 @@ void waitButton(TEV3Buttons button_name)
 	while(getButtonPress(button_name))
 	{}
 }
-void autoScan()
+float autoScan()
 {
 	float lowestDist = 0;
 	int angleAt = 0;
 	const int power = 1;
-	string output = "";
 	for(int angle = 0; angle < 360; angle++)
 	{
 	rotateRobot(angle, power);
@@ -132,6 +134,6 @@ void autoScan()
 		angleAt = SensorType[S4];
 	}
 	}
-	angleAtScan = angleAt;
-	ScanDistance = lowestDist;
+	rotateRobot(angleAt, power);
+	return lowestDist;
 	}
