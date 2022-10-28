@@ -69,3 +69,7 @@ task main()
 
 
 }
+void drive(int power)
+{
+	motor[motorA]=motor[motorD]=power;
+}
