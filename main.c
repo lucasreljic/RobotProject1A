@@ -1,3 +1,8 @@
+void configureAllSensors(); //configures all sensors to standard configuration
+void drive(int motor_power); //powers both drive motors with the same power
+void driveBoth (int motor_power_A, int motor_power_D); //powers both motors independently
+void waitButton(TEV3Buttons button_name);  // wait for push and release of specified button
+
 int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
 	resetGyro(S4);
@@ -68,4 +73,40 @@ task main()
 
 
 
+}
+
+void configureAllSensors()
+{
+	SensorType[S1] = sensorEV3_Touch;
+	SensorType[S2] = sensorEV3_Ultrasonic;
+	SensorType[S3] = sensorEV3_Color;
+	wait1Msec(50);
+	SensorMode[S3] = modeEV3Color_Color;
+	wait1Msec(50);
+
+	SensorType[S4] = sensorEV3_Gyro;
+	wait1Msec(50);
+	SensorMode[S4] = modeEV3Gyro_Calibration;
+	wait1Msec(100);
+	SensorMode[S4] = modeEV3Gyro_RateAndAngle;
+	wait1Msec(50);
+}
+
+void drive(int motor_power)//powers both drive motors with the same power
+{
+	motor[motorA] = motor[motorD] = motor_power;
+}
+
+void driveBoth(int motor_power_A, int motor_power_D)//powers both motors independently
+{
+	motor[motorA] = motor_power_A;
+	motor[motorD] = motor_power_D;
+}
+
+void waitButton(TEV3Buttons button_name)
+{
+	while(!getButtonPress(button_name))
+	{}
+	while(getButtonPress(button_name))
+	{}
 }
