@@ -58,24 +58,19 @@ void configureSensors()
 
 int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
-	resetGyro(S4);
 	int lastGyro = getGyroDegrees(S4);
-	const float kP = 0.25;
-	const float kI = 0.0008;
-	const float kD = 0.15;
-	const float tolerance = 0.9;
-	nMotorEncoder[motorA] = 0;
-	float error = angle - getGyroDegrees(S4);
-	displayString(5, "%f",error);
+	const float kP = 0.5;//0.26
+	const float kI = 0.001;//0.0008
+	const float kD = 0.01;//0.23
+	const float tolerance = 0.25;
+	float error = angle - (getGyroDegrees(S4)-lastGyro);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs(getGyroDegrees(S4) - angle) > tolerance)
+	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(S4)-lastGyro) - angle) > tolerance)
 	{
-		error = angle - (getGyroDegrees(S4));
+		error = abs(angle - (getGyroDegrees(S4)-lastGyro));
 		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
-		displayString(7, "%f",mPower);
-		displayString(5, "%f",error);
 		if (angle>0)
 		{
 			driveBoth(-mPower, mPower);
@@ -84,18 +79,11 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 		{
 			driveBoth(mPower,-mPower);
 		}
-			//wait1Msec(100);
 		prevError = error;
+		displayString(5, "%f",getGyroDegrees(S4));
 	}
-
 	drive(0);
-	if(SensorValue[S1] == 1)
-	{
-		return abs(getGyroDegrees(S4));
-	}
-	else{
-		return 90;
-	}
+	return abs(getGyroDegrees(S4));
 }
 
 
@@ -105,7 +93,7 @@ void drivePID(int distance)
 	const float kI = 0.005;
 	const float kD = 0.05;
 	const float TickToCM = 180/(PI*2.75);
-	const float tolerance = 0.9;
+	const float tolerance = 0.5;
 	nMotorEncoder[motorA] = 0;
 	float error = distance - nMotorEncoder[motorA]*TickToCM;
 	displayString(5, "%f",error);
