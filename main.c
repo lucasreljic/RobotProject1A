@@ -168,6 +168,9 @@ void correctiveDrive(int distance)
 		if(mPower > MAX_POWER)
 		{
 			mPower = MAX_POWER;
+		}else if (mPower < -MAX_POWER)
+		{
+			mPower = -MAX_POWER;
 		}
 		driveBoth(mPower -mTurnPower, mPower +mTurnPower);//add turn power to drive power to adjust for
 		displayString(5, "%f",getGyroDegrees(S4));// printing Gyro Degrees
