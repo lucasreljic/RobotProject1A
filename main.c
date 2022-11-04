@@ -152,30 +152,41 @@ void correctiveDrive(int distance)
 	const float tolerance = 0.5;
 	nMotorEncoder[MOTOR_RIGHT] = 0;
 	nMotorEncoder[MOTOR_LEFT] = 0;
-	float error = distance;
-	displayString(5, "%f",error);
 	float mPower = 0;
 	float prevError = 0;
+	int inverted = 1;
 	time1[T1] = 0;// start timer for PID loop
+	if (distance < 0)// allows for negative direction
+	{
+		inverted = -1;
+	}
+	float error = distance*inverted;
+	float distanceTravelled = 0;
 	while (!getButtonPress(buttonEnter) && abs(error) > tolerance && SensorValue[S1] == 0)
 	{
+		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
+		{
+			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TickToCM;
+		}
+		else
+		{
+			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TickToCM;
+		}
 		turnError = angle - getGyroDegrees(S4);// Turn PID error
 		mTurnPower = turnkP*turnError + turnkI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + turnkD*(turnError-turnPrevError);// turn pid calculation
-		error = distance - ((nMotorEncoder[MOTOR_RIGHT] + nMotorEncoder[MOTOR_LEFT])/2)/TickToCM;// Drive PID error
+		error = (distance - distanceTravelled)*inverted;// Drive PID error
 
 		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));// drive PID calculation
-		displayString(7, "%f",mPower);
 		if(mPower > MAX_POWER)
 		{
 			mPower = MAX_POWER;
-		}else if (mPower < -MAX_POWER)
-		{
-			mPower = -MAX_POWER;
 		}
-		driveBoth(mPower -mTurnPower, mPower +mTurnPower);//add turn power to drive power to adjust for
+		driveBoth((mPower*inverted -mTurnPower), (mPower*inverted +mTurnPower));//add turn power to drive power to adjust for
 		displayString(5, "%f",getGyroDegrees(S4));// printing Gyro Degrees
 		prevError = error;// for PID
 		turnPrevError = turnError;// for Turn PID
+		displayString(7, "%f",mPower);
+		displayString(9, "%f",error);
 	}
 	rotateAbsolute(angle);
 	drive(0);// stop motors
