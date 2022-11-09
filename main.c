@@ -1,5 +1,5 @@
 
-
+#include "EV3Servo-lib-UW.c"
 const int motorLeft = motorD;
 const int motorRight = motorA;
 
@@ -15,20 +15,22 @@ task main()
 {
 	clearDebugStream();
 	configureSensors();
-
+	setGripperPosition(S1, 5, 25);
 	while (true)
 	{
 		while(!getButtonPress(buttonAny))
 		{}
 
 		if (getButtonPress(buttonLeft))
-			rotateRobot(-90);
+			//rotateRobot(-90);
+			setGripperPosition(S1, 5, 60);
 		else if (getButtonPress(buttonRight))
-			rotateRobot(90);
+			//rotateRobot(90);
+			setGripperPosition(S1, 5, 10);
 		else if (getButtonPress(buttonUp))
-			drivePID(50);
+			rotateRobot(-90);
 		else if (getButtonPress(buttonDown))
-			drivePID(-50);
+			rotateRobot(90);
 		else if (getButtonPress(buttonEnter))
 			goto exit;
 	}
@@ -40,6 +42,9 @@ task main()
 
 void configureSensors()
 {
+	// configure servo controller port
+	SensorType[S1] = sensorI2CCustom9V;
+	wait1Msec(50);
 	SensorType[S1]=sensorEV3_Touch;
 	wait1Msec(50);
 	SensorType[S2]=sensorEV3_Ultrasonic;
