@@ -31,9 +31,15 @@ task main()
 		else if (getButtonPress(buttonRight))
 			setGripperPosition(S1, 5, 10);
 		else if (getButtonPress(buttonUp))
-			//correctiveDrive(-50);
-			//setGripperPosition(S1, 5, 10);
+		{
+			correctiveDrive(-20);
+			setGripperPosition(S1, 5, 10);
 			LiftPID(20);
+			correctiveDrive(15);
+			setGripperPosition(S1, 5, 65);
+			correctiveDrive(10);
+			LiftPID(-20);
+		}
 		else if (getButtonPress(buttonDown))
 			LiftPID(-20);
 		else if (getButtonPress(buttonEnter))
