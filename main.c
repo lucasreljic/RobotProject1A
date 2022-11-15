@@ -1,15 +1,20 @@
 
 #include "EV3Servo-lib-UW.c"
+//start of code
 
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
 const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
+const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
+const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
+const float ULTRA_DEG = 12;
+const float SENSOR_OFFSET = 5;
 
 
 void configureSensors();
 int rotateRobot(int angle);
-void drivePID(int distance);
+void driveUltrasonic(int distance);
 void correctiveDrive(int distance);
 void LiftPID(int distance);
 void driveBoth(int pwrL, int pwrR);
@@ -41,7 +46,7 @@ task main()
 			LiftPID(-20);
 		}
 		else if (getButtonPress(buttonDown))
-			LiftPID(-20);
+			driveUltrasonic(75);
 		else if (getButtonPress(buttonEnter))
 			goto exit;
 	}
@@ -98,6 +103,8 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 	drive(0);
 	return abs(getGyroDegrees(S4));
 }
+
+
 int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
 	const float kP = 0.5;//0.26
@@ -120,27 +127,35 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 	return abs(getGyroDegrees(S4));
 }
 
-void drivePID(int distance)
+void driveUltrasonic(int distance)
 {
-	const float kP = 0.85;
-	const float kI = 0.005;
-	const float kD = 0.05;
-	const float TickToCM = 180/(PI*1.6);
-	const float tolerance = 0.5;
+
 	nMotorEncoder[motorA] = 0;
-	float error = distance - nMotorEncoder[motorA]*TickToCM;
-	displayString(5, "%f",error);
-	float mPower = 0;
-	float prevError = 0;
-	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > tolerance && SensorValue[S1] == 0)
+	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
+	int inverted = 1;
+	const float tolerance = 0.5;
+	float sensorDistance = 0;
+	float threshold = SensorValue[S2] - 5;
+	while (!getButtonPress(buttonEnter) && !(SensorValue[S2] < threshold))
 	{
-		error = distance - nMotorEncoder[motorA]/TickToCM;
-		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
-		displayString(7, "%f",mPower);
-		displayString(5, "%f",error);
-		drive(mPower);
-		prevError = error;
+		sensorDistance = SensorValue[S2];
+		displayString(7, "%f",SensorValue[S2]);
+		if(abs(error) < tolerance)
+		{
+			inverted *= -1;
+		}
+
+		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
+		drive(20*inverted);
+	}
+	if(SensorValue[S2] < threshold)
+	{
+		sensorDistance = SensorValue[S2];
+		writeDebugStreamLine("%f", sensorDistance);
+		drive(0);
+		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*PI/180)*sensorDistance);
+		rotateRobot(-90);
+		correctiveDrive(sensorDistance);
 	}
 	drive(0);
 }
@@ -159,7 +174,6 @@ void correctiveDrive(int distance)
 	float turnError = 0;
 	float mTurnPower = 0;
 	float turnPrevError = 0;
-	const float TickToCM = 180/(PI*1.6);//Encoder ticks to CM calculation
 	const float tolerance = 0.5;
 	nMotorEncoder[MOTOR_RIGHT] = 0;
 	nMotorEncoder[MOTOR_LEFT] = 0;
@@ -177,11 +191,11 @@ void correctiveDrive(int distance)
 	{
 		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
 		{
-			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TickToCM;
+			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TICK_TO_CM;
 		}
 		else
 		{
-			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TickToCM;
+			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
 		}
 		turnError = angle - getGyroDegrees(S4);// Turn PID error
 		mTurnPower = turnkP*turnError + turnkI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + turnkD*(turnError-turnPrevError);// turn pid calculation
@@ -218,17 +232,16 @@ void LiftPID(int distance)
 	const float kP = 0.55;
 	const float kI = 0.005;
 	const float kD = 0.05;
-	const float TickToCM = 180/(PI*1);
 	const float tolerance = 0.5;
 	nMotorEncoder[MOTOR_LIFT] = 0;
-	float error = distance - nMotorEncoder[MOTOR_LIFT]*TickToCM;
+	float error = distance - nMotorEncoder[MOTOR_LIFT]*TICK_TO_CM;
 	displayString(5, "%f",error);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
 	while (!getButtonPress(buttonEnter) && abs(error) > tolerance && SensorValue[S1] == 0)
 	{
-		error = distance - nMotorEncoder[MOTOR_LIFT]/TickToCM;
+		error = distance - nMotorEncoder[MOTOR_LIFT]/TICK_TO_CM;
 		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
 		displayString(7, "%f",mPower);
 		displayString(5, "%f",error);
