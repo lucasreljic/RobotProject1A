@@ -7,6 +7,7 @@ const int MAX_POWER = 70;
 const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
 //const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
 const float DEG_TO_RAD = PI/180;
+const float RAD_TO_DEG = 180/PI;
 const float ULTRA_DEG = 12;
 const float SENSOR_OFFSET = 5;
 
@@ -54,7 +55,7 @@ task main()
 		else if (getButtonPress(buttonUp))
 			correctiveDrive(-30);
 		else if (getButtonPress(buttonDown))
-			correctiveDrive(30);
+			returnToOrigin();
 		else if (getButtonPress(buttonEnter))
 			goto exit;
 	}
@@ -278,6 +279,13 @@ void returnToOrigin()
 {
 	displayString(5, "rotating");
 	rotateAbsolute(180);
-	rotateRobot(atan(robotPos.y/robotPos.x));
-	correctiveDrive( sqrt(pow(robotPos.x, 2) + pow(robotPos.y, 2)) );
+
+	float angle = 0;
+	angle = robotPos.x==0? 90 : atan(robotPos.y/robotPos.x)*RAD_TO_DEG;
+	displayString(7, "angle: %f", angle);
+
+	rotateRobot(angle);
+	correctiveDrive( -sqrt(pow(robotPos.x, 2) + pow(robotPos.y, 2)) );
+
+	rotateAbsolute(0);
 }
