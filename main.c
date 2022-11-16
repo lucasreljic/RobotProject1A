@@ -272,15 +272,16 @@ void triangulate()
         int triLengthA = SensorValue[S3];
         int triLengthC = (getMuxSensorValue(RIGHT_ULTRA))/10;
         if(triLengthA == 0 || triLengthC == 0)
-        {
         	writeDebugStreamLine("ERROR");
-        }
-        float gammaInit = (acos((pow(triLengthA, 2) + pow(triLengthB, 2) - pow(triLengthC, 2))/(2*triLengthA*triLengthB)))/DEG_TO_RAD;
-        float avgTriLength = (triLengthA + triLengthC)/2;
-        float gammaFinal = acos(triLengthB/(2*avgTriLength))/DEG_TO_RAD;
-        int deltaGamma = ceil(gammaInit - gammaFinal);
-        if(abs(deltaGamma) < 90){
-
-        	rotateRobot(deltaGamma);
+        if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
+        {
+        	float gammaInit = (acos((pow(triLengthA, 2) + pow(triLengthB, 2) - pow(triLengthC, 2))/(2*triLengthA*triLengthB)))/DEG_TO_RAD;
+        	float avgTriLength = (triLengthA + triLengthC)/2;
+        	float gammaFinal = acos(triLengthB/(2*avgTriLength))/DEG_TO_RAD;
+        	int deltaGamma = ceil(gammaInit - gammaFinal);
+        	if(abs(deltaGamma) < 90)
+        		{
+        		rotateRobot(deltaGamma);
+      			}
       	}
     }
