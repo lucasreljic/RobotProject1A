@@ -102,7 +102,7 @@ int getMuxSensorValue(int i)
 
 void configureSensors()
 {
-	SensorType[LEFT_ULTRA_PORT]=sensorSONAR;
+	SensorType[LEFT_ULTRA_PORT] = sensorSONAR;
 	wait1Msec(50);
 	SensorType[GYRO_PORT] = sensorEV3_Gyro;
 	wait1Msec(50);
@@ -160,39 +160,6 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 }
 
 
-void driveUltrasonic(int distance)
-{
-
-	nMotorEncoder[motorA] = 0;
-	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
-	int inverted = 1;
-	const float tolerance = 0.5;
-	float sensorDistance = 0;
-	float threshold = SensorValue[S2] - 5;
-	while (!getButtonPress(buttonEnter) && !(SensorValue[S2] < threshold))
-	{
-		sensorDistance = SensorValue[S2];
-		displayString(7, "%f",SensorValue[S2]);
-		if(abs(error) < tolerance)
-		{
-			inverted *= -1;
-		}
-
-		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
-		drive(20*inverted);
-	}
-	if(SensorValue[S2] < threshold)
-	{
-		sensorDistance = SensorValue[S2];
-		writeDebugStreamLine("%f", sensorDistance);
-		drive(0);
-		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*PI/180)*sensorDistance);
-		rotateRobot(-90);
-		correctiveDrive(sensorDistance);
-	}
-	drive(0);
-}
-
 int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
 	const float KP = 0.5;//0.26
@@ -243,10 +210,10 @@ void driveUltrasonic(int distance)
 	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
 	int inverted = 1;
 	float sensorDistance = 0;
-	float threshold = SensorValue[SIDE_ULTRA_PORT] - 5;
-	while (!getButtonPress(buttonEnter) && !(SensorValue[SIDE_ULTRA_PORT] < threshold))
+	float threshold = getMuxSensorValue(SIDE_ULTRA_PORT) - 5;
+	while (!getButtonPress(buttonEnter) && !(getMuxSensorValue(SIDE_ULTRA_PORT) < threshold))
 	{
-		sensorDistance = SensorValue[SIDE_ULTRA_PORT];
+		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT);
 		if(abs(error) < TOLERANCE)
 		{
 			inverted *= -1;
@@ -255,9 +222,9 @@ void driveUltrasonic(int distance)
 		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
 		drive(20*inverted);
 	}
-	if(SensorValue[SIDE_ULTRA_PORT] < threshold)
+	if(getMuxSensorValue(SIDE_ULTRA_PORT) < threshold)
 	{
-		sensorDistance = SensorValue[SIDE_ULTRA_PORT];
+		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT);
 		drive(0);
 		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance);
 		rotateRobot(-90);
