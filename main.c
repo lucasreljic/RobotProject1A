@@ -18,7 +18,7 @@ int rotateAbsolute(int angle);
 int getMuxSensorValue(int i);
 void triangulate();
 void returnToOrigin();
-
+void EShutdown();
 
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
@@ -36,6 +36,7 @@ const float TRI_LENGTH_B = 20;
 // sensor constants
 const int RIGHT_ULTRA_PORT = 0;
 const int SIDE_ULTRA_PORT = 1;
+const int GRIPPER_PORT = (int) S2;
 const int LEFT_ULTRA_PORT = (int) S3;
 const int COLOR_PORT = 2;
 const int GYRO_PORT = (int) S4;
@@ -116,6 +117,12 @@ void configureSensors()
 	wait1Msec(50);
 }
 
+void EShutdown() // called when stuff goes really wrong
+{
+	driveBoth(0,0);
+	setGripperPosition(GRIPPER_PORT, 5, 65);
+	liftPID(0);
+}
 
 
 // -
