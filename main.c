@@ -239,18 +239,16 @@ void LiftPID(int distance)
 	motor[MOTOR_LIFT] = 0;
 }
 
+const double triLengthB = 20;
+
 void triangulate()
     {
         //S1 (left) and S2 (right) are placeholder sensor values for two us sensors
-        while (SensorValue[S1]*10 != SensorValue[S2])
-        {
-            if (SensorValue[S1]*10 > SensorValue[S2])
-            {
-                rotateRobot(1);
-          }
-            if (SensorValue[S1]*10 < SensorValue[S2])
-          {
-              rotateRobot(-1);
-          }
-        }
+        triLengthA = SensorValue[S3];
+        triLengthC = SensorValue[S2];
+        gammaInit = acos(pow(triLengthA, 2) + pow(triLengthB, 2) - pow(triLengthC, 2))/(2*triLengthA*triLengthB));
+        avgTriLength = (triLengthA + triLengthC)/2;
+        gammaFinal = acos(triLengthB/(2*avgTriLength));
+        deltaGamma = gammaInit - gammaFinal;
+        rotateRobot(deltaGamma);
     }
