@@ -11,6 +11,9 @@ const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
 const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
+const int RIGHT_ULTRA = 0;
+const int SIDE_ULTRA = 1;
+const int COLOR_SENSOR = 2;
 const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
 const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
 const float ULTRA_DEG = 12;
@@ -26,6 +29,7 @@ void driveBoth(int pwrL, int pwrR);
 void drive(int pwr);
 int rotateAbsolute(int angle);
 tEV3SensorTypeMode typeMode[3] = {sonarCM, sonarCM, colorMeasureColor};
+int getMuxSensorValue(int i);
 
 task main()
 {
@@ -51,53 +55,13 @@ displayCenteredTextLine(0, "Mindsensors");
 
   while (true)
   {
- 		for (int i = 0; i < 3; i++)
- 		{
-			if (!readSensor(&muxedSensor[i]))
-				writeDebugStreamLine("readSensor() failed! for %d", i);
+  	writeDebugStreamLine("%d", getMuxSensorValue(RIGHT_ULTRA));
+  	writeDebugStreamLine("%d", getMuxSensorValue(SIDE_ULTRA));
+  	writeDebugStreamLine("%d", getMuxSensorValue(COLOR_SENSOR));
 
- 			switch(muxedSensor[i].typeMode)
- 			{
-		 		case colorMeasureColor:
-					displayTextLine(i*1, "Chan[%d]: Color: %d", i+1, muxedSensor[i].color);
-		 			break;
-
-			  case infraRedProximity:
-					displayTextLine(i*3, "Chan[%d]: IR Prox", i+1);
-					displayTextLine(i*3 + 1, "Distance: %d", muxedSensor[i].distance);
-			  	break;
-
-			  // Only beacon data (proximity and heading) for channel 1 is displayed
-			  case infraRedBeacon:
-					displayTextLine(i*3, "Chan[%d]: IR Beac", i+1);
-					displayTextLine(i*3 + 1, "Prox: %d, Head: %d", muxedSensor[i].beaconProx[0], muxedSensor[i].beaconHeading[0]);
-			  	break;
-
-			  case infraRedRemote:
-					displayTextLine(i*3, "Chan[%d]: IR Rem ", i+1);
-					displayTextLine(i*3 + 1, "1: %02d, 2: %02d, 3: %02d, 1: %02d", muxedSensor[i].touch ? "yes" : "no ", muxedSensor[i].bumpCount);
-			  	break;
-
-			  case sonarCM:
-					displayTextLine(i*3, "Chan[%d]: US CM", i+1);
-					displayTextLine(i*3 + 1, "Distance: %d", muxedSensor[i].distance);
-					break;
-		  }
-		  displayTextLine(i*3 +2, " ");
- 		}
   	sleep(100);
-  //}
 
-
-
-	//while (true)
-	//{
-		//displayTextLine(5, "%d", muxedSensor[2].color);
-		//displayTextLine(7, "%d", muxedSensor[1].distance);
-		//while(!getButtonPress(buttonAny))
-		//{}
-
-		if (getButtonPress(buttonLeft)){
+  	if (getButtonPress(buttonLeft)){
 			setGripperPosition(S2, 5, 65);
 
 		}
@@ -125,14 +89,24 @@ displayCenteredTextLine(0, "Mindsensors");
 
 
 
+int getMuxSensorValue(int i)
+{
 
+	if (!readSensor(&muxedSensor[i]))
+		writeDebugStreamLine("readSensor() failed! for %d", i);
+ 	if(muxedSensor[i].typeMode == sonarCM)
+		return muxedSensor[i].distance;
+	else if (muxedSensor[i].typeMode == colorMeasureColor)
+		return muxedSensor[i].color;
+	return -1;
+}
 void configureSensors()
 {
 	// configure servo controller port
 	//SensorType[S1] = sensorI2CCustom9V;
 	//wait1Msec(50);
-	//SensorType[S2]=sensorEV3_Ultrasonic;
-	//wait1Msec(50);
+	SensorType[S3]=sensorEV3_Ultrasonic;
+	wait1Msec(50);
 	//SensorType[S3]=sensorEV3;
 	///wait1Msec(50);
 	SensorType[S4] = sensorEV3_Gyro;
