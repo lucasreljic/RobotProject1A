@@ -6,22 +6,6 @@
 #include "mindsensors-ev3smux.h"
 #include "EV3Servo-lib-UW.c"
 #include "EV3Multiplex.c"
-//start of code
-
-const int MOTOR_LEFT = motorD;
-const int MOTOR_RIGHT = motorA;
-const int MOTOR_LIFT = motorC;
-const int MAX_POWER = 70;
-const int RIGHT_ULTRA = 0;
-const int SIDE_ULTRA = 1;
-const int COLOR_SENSOR = 2;
-const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
-const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
-const float DEG_TO_RAD = PI/180;
-const float ULTRA_DEG = 12;
-const float SENSOR_OFFSET = 5;
-
-tMSEV3 muxedSensor[3];
 
 void configureSensors();
 int rotateRobot(int angle);
@@ -31,10 +15,46 @@ void LiftPID(int distance);
 void driveBoth(int pwrL, int pwrR);
 void drive(int pwr);
 int rotateAbsolute(int angle);
-tEV3SensorTypeMode typeMode[3] = {sonarCM, sonarCM, colorMeasureColor};
 int getMuxSensorValue(int i);
 void triangulate ();
+void returnToOrigin();
+//start of code
 
+const int MOTOR_LEFT = motorD;
+const int MOTOR_RIGHT = motorA;
+const int MOTOR_LIFT = motorC;
+const int MAX_POWER = 70;
+const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
+//const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
+const float DEG_TO_RAD = PI/180;
+const float RAD_TO_DEG = 180/PI;
+const float ULTRA_DEG = 12;
+const float SENSOR_OFFSET = 5;
+
+
+// sensor constants
+const int RIGHT_ULTRA_PORT = 0;
+const int SIDE_ULTRA_PORT = 1;
+const int LEFT_ULTRA_PORT = (int) S3;
+const int COLOR_PORT = 2;
+const int GYRO_PORT = (int) S4;
+
+
+
+
+tMSEV3 muxedSensor[3];
+tEV3SensorTypeMode typeMode[3] = {sonarCM, sonarCM, colorMeasureColor};
+
+// tracks position (x and y coordinates) in cm
+typedef struct
+{
+	float x;
+	float y;
+} Position;
+
+
+// tracks position of robot
+Position robotPos;
 
 task main()
 {
@@ -49,19 +69,24 @@ task main()
 
   if (!initSensor(&muxedSensor[2], msensor_S1_3, typeMode[2]))
   	writeDebugStreamLine("initSensor() failed! for msensor_S1_3");
+	robotPos.x = 0;
+	robotPos.y = 0;
 
 	while (!getButtonPress(buttonEnter))
 	{
-		triangulate();
-		//while(!getButtonPress(buttonAny))
-		//{}
-		//if (getButtonPress(buttonLeft))
-		//{
-		//	triangulate();
-	  //}
+		while(!getButtonPress(buttonAny))
+		{}
+
+		if (getButtonPress(buttonLeft))
+			rotateRobot(10);
+		else if (getButtonPress(buttonRight))
+			rotateRobot(-10);
+		else if (getButtonPress(buttonUp))
+			correctiveDrive(-30);
+		else if (getButtonPress(buttonDown))
+			returnToOrigin();
 	}
 }
-
 
 int getMuxSensorValue(int i)
 {
@@ -74,35 +99,52 @@ int getMuxSensorValue(int i)
 		return muxedSensor[i].color;
 	return -1;
 }
+
 void configureSensors()
 {
-	// configure servo controller port
-	SensorType[S3]=sensorSONAR;
+	SensorType[LEFT_ULTRA_PORT]=sensorSONAR;
 	wait1Msec(50);
-	SensorType[S4] = sensorEV3_Gyro;
+	SensorType[GYRO_PORT] = sensorEV3_Gyro;
 	wait1Msec(50);
-	SensorMode[S4] = modeEV3Gyro_Calibration;
+	SensorMode[GYRO_PORT] = modeEV3Gyro_Calibration;
 	wait1Msec(50);
-	SensorMode[S4] = modeEV3Gyro_RateAndAngle;
+	SensorMode[GYRO_PORT] = modeEV3Gyro_RateAndAngle;
 	wait1Msec(50);
-	return;
 }
 
+
+
+// -
+void drive(int pwr)
+{
+	motor[MOTOR_LEFT] = motor[MOTOR_RIGHT] = pwr;
+}
+
+
+// -
+void driveBoth(int pwrL, int pwrR)
+{
+	motor[MOTOR_LEFT] = pwrL;
+	motor[MOTOR_RIGHT] = pwrR;
+}
+
+
+// -
 int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
-	int lastGyro = getGyroDegrees(S4);
-	const float kP = 0.5;//0.26
-	const float kI = 0.001;//0.0008
-	const float kD = 0.01;//0.23
-	const float tolerance = 0.25;
-	float error = angle - (getGyroDegrees(S4)-lastGyro);
+	int lastGyro = getGyroDegrees(GYRO_PORT);
+	const float KP = 0.5;//0.26
+	const float KI = 0.001;//0.0008
+	const float KD = 0.01;//0.23
+	const float TOLERANCE = 0.25;
+	float error = angle - (getGyroDegrees(GYRO_PORT)-lastGyro);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(S4)-lastGyro) - angle) > tolerance)
+	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)-lastGyro) - angle) > TOLERANCE)
 	{
-		error = abs(angle - (getGyroDegrees(S4)-lastGyro));
-		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
+		error = abs(angle - (getGyroDegrees(GYRO_PORT)-lastGyro));
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
 		if (angle>0)
 		{
 			driveBoth(-mPower, mPower);
@@ -112,34 +154,11 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 			driveBoth(mPower,-mPower);
 		}
 		prevError = error;
-		displayString(5, "%f",getGyroDegrees(S4));
 	}
 	drive(0);
-	return abs(getGyroDegrees(S4));
+	return abs(getGyroDegrees(GYRO_PORT));
 }
 
-
-int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
-{
-	const float kP = 0.5;//0.26
-	const float kI = 0.001;//0.0008
-	const float kD = 0.01;//0.23
-	const float tolerance = 0.25;
-	float error = angle - (getGyroDegrees(S4));//
-	float mPower = 0;
-	float prevError = 0;
-	time1[T1] = 0;// reset timer for PID loop
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(S4)) - angle) > tolerance)
-	{
-		error = angle - getGyroDegrees(S4);// error for turn PID
-		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
-		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
-		prevError = error;// previous error for PID
-		displayString(5, "%f",getGyroDegrees(S4));
-	}
-	drive(0);
-	return abs(getGyroDegrees(S4));
-}
 
 void driveUltrasonic(int distance)
 {
@@ -174,103 +193,33 @@ void driveUltrasonic(int distance)
 	drive(0);
 }
 
-void correctiveDrive(int distance)
+int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
-	//Driving PID Constants
-	const float kP = 1;
-	const float kI = 0.001;
-	const float kD = 0.02;
-	//Turn PID Constants
-	const float turnkP = 0.5;//0.26
-	const float turnkI = 0.0005;//0.0008
-	const float turnkD = 0.01;//0.23
-	float angle = getGyroDegrees(S4);//get angle before driving starts
-	float turnError = 0;
-	float mTurnPower = 0;
-	float turnPrevError = 0;
-	const float tolerance = 0.5;
-	nMotorEncoder[MOTOR_RIGHT] = 0;
-	nMotorEncoder[MOTOR_LEFT] = 0;
+	const float KP = 0.5;//0.26
+	const float KI = 0.001;//0.0008
+	const float KD = 0.01;//0.23
+	const float TOLERANCE = 0.25;
+	float error = angle - (getGyroDegrees(GYRO_PORT));//
 	float mPower = 0;
 	float prevError = 0;
-	int inverted = 1;
-	time1[T1] = 0;// start timer for PID loop
-	if (distance < 0)// allows for negative direction
+	time1[T1] = 0;// reset timer for PID loop
+	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)) - angle) > TOLERANCE)
 	{
-		inverted = -1;
+		error = angle - getGyroDegrees(GYRO_PORT);// error for turn PID
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
+		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
+		prevError = error;// previous error for PID
 	}
-	float error = distance*inverted;
-	float distanceTravelled = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > tolerance)
-	{
-		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
-		{
-			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TICK_TO_CM;
-		}
-		else
-		{
-			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
-		}
-		turnError = angle - getGyroDegrees(S4);// Turn PID error
-		mTurnPower = turnkP*turnError + turnkI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + turnkD*(turnError-turnPrevError);// turn pid calculation
-		error = (distance - distanceTravelled)*inverted;// Drive PID error
-
-		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));// drive PID calculation
-		if(mPower > MAX_POWER)
-		{
-			mPower = MAX_POWER;
-		}
-		driveBoth((mPower*inverted -mTurnPower), (mPower*inverted +mTurnPower));//add turn power to drive power to adjust for
-		displayString(5, "%f",getGyroDegrees(S4));// printing Gyro Degrees
-		prevError = error;// for PID
-		turnPrevError = turnError;// for Turn PID
-		displayString(7, "%f",mPower);
-		displayString(9, "%f",error);
-	}
-	rotateAbsolute(angle);
-	drive(0);// stop motors
-}
-void driveBoth(int pwrL, int pwrR)
-{
-	motor[MOTOR_LEFT] = pwrL;
-	motor[MOTOR_RIGHT] = pwrR;
-}
-
-
-void drive(int pwr)
-{
-	motor[MOTOR_LEFT] = motor[MOTOR_RIGHT] = pwr;
-}
-void LiftPID(int distance)
-{
-	const float kP = 0.55;
-	const float kI = 0.005;
-	const float kD = 0.05;
-	const float tolerance = 0.5;
-	nMotorEncoder[MOTOR_LIFT] = 0;
-	float error = distance - nMotorEncoder[MOTOR_LIFT]*TICK_TO_CM;
-	displayString(5, "%f",error);
-	float mPower = 0;
-	float prevError = 0;
-	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > tolerance)
-	{
-		error = distance - nMotorEncoder[MOTOR_LIFT]/TICK_TO_CM;
-		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
-		displayString(7, "%f",mPower);
-		displayString(5, "%f",error);
-		motor[MOTOR_LIFT] = mPower;
-		prevError = error;
-	}
-	motor[MOTOR_LIFT] = 0;
+	drive(0);
+	return abs(getGyroDegrees(GYRO_PORT));
 }
 
 const float triLengthB = 20;
 
 void triangulate()
     {
-        int triLengthA = SensorValue[S3];
-        int triLengthC = (getMuxSensorValue(RIGHT_ULTRA))/10;
+        int triLengthA = SensorValue[LEFT_ULTRA_PORT];
+        int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
         if(triLengthA == 0 || triLengthC == 0)
         	writeDebugStreamLine("ERROR");
         if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
@@ -285,3 +234,138 @@ void triangulate()
       			}
       	}
     }
+// -
+void driveUltrasonic(int distance)
+{
+
+	nMotorEncoder[motorA] = 0;
+	const float TOLERANCE = 0.5;
+	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
+	int inverted = 1;
+	float sensorDistance = 0;
+	float threshold = SensorValue[SIDE_ULTRA_PORT] - 5;
+	while (!getButtonPress(buttonEnter) && !(SensorValue[SIDE_ULTRA_PORT] < threshold))
+	{
+		sensorDistance = SensorValue[SIDE_ULTRA_PORT];
+		if(abs(error) < TOLERANCE)
+		{
+			inverted *= -1;
+		}
+
+		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
+		drive(20*inverted);
+	}
+	if(SensorValue[SIDE_ULTRA_PORT] < threshold)
+	{
+		sensorDistance = SensorValue[SIDE_ULTRA_PORT];
+		drive(0);
+		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance);
+		rotateRobot(-90);
+		correctiveDrive(sensorDistance);
+	}
+	drive(0);
+}
+
+
+// -
+void correctiveDrive(int distance)
+{
+
+	//Driving PID Constants
+	const float KP = 1;
+	const float KI = 0.001;
+	const float KD = 0.02;
+	//Turn PID Constants
+	const float TURN_KP = 0.5;//0.26
+	const float TURN_KI = 0.0005;//0.0008
+	const float TURN_KD = 0.01;//0.23
+	const float ANGLE = getGyroDegrees(GYRO_PORT);//get angle before driving starts
+	const float TOLERANCE = 0.5;
+	float turnError = 0;
+	float mTurnPower = 0;
+	float turnPrevError = 0;
+	nMotorEncoder[MOTOR_RIGHT] = 0;
+	nMotorEncoder[MOTOR_LEFT] = 0;
+	float mPower = 0;
+	float prevError = 0;
+	int inverted = 1;
+	time1[T1] = 0;// start timer for PID loop
+	if (distance < 0)// allows for negative direction
+	{
+		inverted = -1;
+	}
+	float error = distance*inverted;
+	float distanceTravelled = 0;
+	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE)
+	{
+		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
+		{
+			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TICK_TO_CM;
+		}
+		else
+		{
+			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
+		}
+		turnError = ANGLE - getGyroDegrees(GYRO_PORT);// Turn PID error
+		mTurnPower = TURN_KP*turnError + TURN_KI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + TURN_KD*(turnError-turnPrevError);// turn pid calculation
+		error = (distance - distanceTravelled)*inverted;// Drive PID error
+
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// drive PID calculation
+		if(mPower > MAX_POWER)
+		{
+			mPower = MAX_POWER;
+		}
+		driveBoth((mPower*inverted -mTurnPower), (mPower*inverted +mTurnPower));//add turn power to drive power to adjust for
+		prevError = error;// for PID
+		turnPrevError = turnError;// for Turn PID
+	}
+	rotateAbsolute(ANGLE);
+	drive(0);// stop motors
+
+	robotPos.x += cos((ANGLE)*DEG_TO_RAD)*-distance;
+	robotPos.y += sin((ANGLE)*DEG_TO_RAD)*-distance;
+
+
+	displayString(1, "x: %f", robotPos.x);
+	displayString(2, "y: %f", robotPos.y);
+	displayString(3, "xcur: %f", cos(ANGLE*DEG_TO_RAD)*distance);
+	displayString(4, "ycur: %f", sin(ANGLE*DEG_TO_RAD)*distance);
+}
+
+
+// -
+void LiftPID(int distance)
+{
+	const float KP = 0.85;
+	const float KI = 0.005;
+	const float KD = 0.05;
+	const float TOLERANCE = 0.5;
+	nMotorEncoder[MOTOR_LIFT] = 0;
+	float error = distance - nMotorEncoder[MOTOR_LIFT]*TICK_TO_CM;
+	float mPower = 0;
+	float prevError = 0;
+	time1[T1] = 0;
+	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE)
+	{
+		error = distance - nMotorEncoder[MOTOR_LIFT]/TICK_TO_CM;
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
+		motor[MOTOR_LIFT] = mPower;
+		prevError = error;
+	}
+	motor[MOTOR_LIFT] = 0;
+}
+
+
+void returnToOrigin()
+{
+	rotateAbsolute(180);
+
+	float angle = 0;
+	angle = robotPos.x==0? 90 : atan(robotPos.y/robotPos.x)*RAD_TO_DEG;
+	displayString(7, "angle: %f", angle);
+
+	rotateRobot(angle);
+	correctiveDrive( -sqrt(pow(robotPos.x, 2) + pow(robotPos.y, 2)) );
+
+	rotateAbsolute(0);
+}
