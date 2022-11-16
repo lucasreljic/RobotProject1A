@@ -9,7 +9,7 @@
 
 void configureSensors();
 int rotateRobot(int angle);
-void driveUltrasonic(int distance);
+bool driveUltrasonic(int distance);
 void correctiveDrive(int distance);
 void LiftPID(int distance);
 void driveBoth(int pwrL, int pwrR);
@@ -18,18 +18,21 @@ int rotateAbsolute(int angle);
 int getMuxSensorValue(int i);
 void triangulate ();
 void returnToOrigin();
+int pickUpObject();
 //start of code
 
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
 const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
+const int TRI_OFFSET = 30;
 const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
 //const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
 const float DEG_TO_RAD = PI/180;
 const float RAD_TO_DEG = 180/PI;
 const float ULTRA_DEG = 12;
 const float SENSOR_OFFSET = 5;
+const float CLAW_OFFSET = 5;
 
 
 // sensor constants
@@ -86,6 +89,44 @@ task main()
 		else if (getButtonPress(buttonDown))
 			returnToOrigin();
 	}
+}
+
+void mainProgram()
+{
+	bool failed = false;
+	LiftPID(20);
+	int count = 0;
+	while (!getButtonPress(buttonEnter) || count < 2 || fail == false)
+	{
+		count = 0;
+	  bool detected = false;
+		while(count < 2 || detected == true)
+		{
+			detected = driveUltrasonic(75);
+			detected = driveUltrasonic(-75);
+			count++;
+		}
+		sleep(1000);
+		triangulate();
+		correctiveDrive(TRI_OFFSET + CLAW_OFFSET);
+		int objectColor = pickUpObject();
+		if (objectColor == -1)
+			failed = true;
+		returnToOrigin();
+		//placeObject(objectColor);  aishwins function
+		returnToOrigin();
+	}
+
+	emergShutdown();
+}
+
+int pickUpObject()
+{
+	setGripperPosition(S1, 5, 65);
+	LiftPID(-20);
+	setGripperPosition(S1, 5, 10);
+	LiftPID(20);
+	return getMuxSensorValue(COLOR_PORT);
 }
 
 int getMuxSensorValue(int i)
@@ -160,7 +201,8 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 }
 
 
-void driveUltrasonic(int distance)
+
+bool driveUltrasonic(int distance)
 {
 
 	nMotorEncoder[motorA] = 0;
@@ -188,9 +230,13 @@ void driveUltrasonic(int distance)
 		drive(0);
 		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*PI/180)*sensorDistance);
 		rotateRobot(-90);
-		correctiveDrive(sensorDistance);
+		if (sensorDistance-TRI_OFFSET > 0)
+			correctiveDrive(sensorDistance-TRI_OFFSET);
+		drive(0);
+		return true;
 	}
 	drive(0);
+	return false;
 }
 
 int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
@@ -261,7 +307,8 @@ void driveUltrasonic(int distance)
 		drive(0);
 		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance);
 		rotateRobot(-90);
-		correctiveDrive(sensorDistance);
+		if (sensorDistance - TRI_OFFSET > 0)
+			correctiveDrive(sensorDistance - TRI_OFFSET);
 	}
 	drive(0);
 }
