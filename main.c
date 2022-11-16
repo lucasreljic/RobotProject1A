@@ -12,6 +12,13 @@ const float ULTRA_DEG = 12;
 const float SENSOR_OFFSET = 5;
 
 
+// sensor constants
+const int TOUCH_PORT = (int) S1;
+const int ULTRASIDE_PORT = (int) S2;
+const int COLOR_PORT = (int) S3;
+const int GYRO_PORT = (int) S4;
+
+
 void configureSensors(); // 1
 void drive(int pwr);
 void driveBoth(int pwrL, int pwrR);
@@ -31,7 +38,7 @@ typedef struct
 } Position;
 
 
-
+// tracks position of robot
 Position robotPos;
 
 
@@ -67,17 +74,17 @@ task main()
 // -
 void configureSensors()
 {
-	SensorType[S1]=sensorEV3_Touch;
+	SensorType[TOUCH_PORT]=sensorEV3_Touch;
 	wait1Msec(50);
-	SensorType[S2]=sensorEV3_Ultrasonic;
+	SensorType[ULTRASIDE_PORT]=sensorEV3_Ultrasonic;
 	wait1Msec(50);
-	SensorType[S3]=sensorEV3_Color;
+	SensorType[COLOR_PORT]=sensorEV3_Color;
 	wait1Msec(50);
-	SensorType[S4] = sensorEV3_Gyro;
+	SensorType[GYRO_PORT] = sensorEV3_Gyro;
 	wait1Msec(50);
-	SensorMode[S4] = modeEV3Gyro_Calibration;
+	SensorMode[GYRO_PORT] = modeEV3Gyro_Calibration;
 	wait1Msec(50);
-	SensorMode[S4] = modeEV3Gyro_RateAndAngle;
+	SensorMode[GYRO_PORT] = modeEV3Gyro_RateAndAngle;
 	wait1Msec(50);
 	return;
 }
@@ -102,18 +109,18 @@ void driveBoth(int pwrL, int pwrR)
 // -
 int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
-	int lastGyro = getGyroDegrees(S4);
+	int lastGyro = getGyroDegrees(GYRO_PORT);
 	const float KP = 0.5;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	const float TOLERANCE = 0.25;
-	float error = angle - (getGyroDegrees(S4)-lastGyro);
+	float error = angle - (getGyroDegrees(GYRO_PORT)-lastGyro);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(S4)-lastGyro) - angle) > TOLERANCE)
+	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)-lastGyro) - angle) > TOLERANCE)
 	{
-		error = abs(angle - (getGyroDegrees(S4)-lastGyro));
+		error = abs(angle - (getGyroDegrees(GYRO_PORT)-lastGyro));
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
 		if (angle>0)
 		{
@@ -126,7 +133,7 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 		prevError = error;
 	}
 	drive(0);
-	return abs(getGyroDegrees(S4));
+	return abs(getGyroDegrees(GYRO_PORT));
 }
 
 
@@ -136,19 +143,19 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	const float TOLERANCE = 0.25;
-	float error = angle - (getGyroDegrees(S4));//
+	float error = angle - (getGyroDegrees(GYRO_PORT));//
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;// reset timer for PID loop
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(S4)) - angle) > TOLERANCE)
+	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)) - angle) > TOLERANCE)
 	{
-		error = angle - getGyroDegrees(S4);// error for turn PID
+		error = angle - getGyroDegrees(GYRO_PORT);// error for turn PID
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
 		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
 		prevError = error;// previous error for PID
 	}
 	drive(0);
-	return abs(getGyroDegrees(S4));
+	return abs(getGyroDegrees(GYRO_PORT));
 }
 
 
@@ -161,10 +168,10 @@ void driveUltrasonic(int distance)
 	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
 	int inverted = 1;
 	float sensorDistance = 0;
-	float threshold = SensorValue[S2] - 5;
-	while (!getButtonPress(buttonEnter) && !(SensorValue[S2] < threshold))
+	float threshold = SensorValue[ULTRASIDE_PORT] - 5;
+	while (!getButtonPress(buttonEnter) && !(SensorValue[ULTRASIDE_PORT] < threshold))
 	{
-		sensorDistance = SensorValue[S2];
+		sensorDistance = SensorValue[ULTRASIDE_PORT];
 		if(abs(error) < TOLERANCE)
 		{
 			inverted *= -1;
@@ -173,9 +180,9 @@ void driveUltrasonic(int distance)
 		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
 		drive(20*inverted);
 	}
-	if(SensorValue[S2] < threshold)
+	if(SensorValue[ULTRASIDE_PORT] < threshold)
 	{
-		sensorDistance = SensorValue[S2];
+		sensorDistance = SensorValue[ULTRASIDE_PORT];
 		drive(0);
 		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance);
 		rotateRobot(-90);
@@ -197,7 +204,7 @@ void correctiveDrive(int distance)
 	const float TURN_KP = 0.5;//0.26
 	const float TURN_KI = 0.0005;//0.0008
 	const float TURN_KD = 0.01;//0.23
-	const float ANGLE = getGyroDegrees(S4);//get angle before driving starts
+	const float ANGLE = getGyroDegrees(GYRO_PORT);//get angle before driving starts
 	const float TOLERANCE = 0.5;
 	float turnError = 0;
 	float mTurnPower = 0;
@@ -214,7 +221,7 @@ void correctiveDrive(int distance)
 	}
 	float error = distance*inverted;
 	float distanceTravelled = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE && SensorValue[S1] == 0)
+	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE && SensorValue[TOUCH_PORT] == 0)
 	{
 		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
 		{
@@ -224,7 +231,7 @@ void correctiveDrive(int distance)
 		{
 			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
 		}
-		turnError = ANGLE - getGyroDegrees(S4);// Turn PID error
+		turnError = ANGLE - getGyroDegrees(GYRO_PORT);// Turn PID error
 		mTurnPower = TURN_KP*turnError + TURN_KI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + TURN_KD*(turnError-turnPrevError);// turn pid calculation
 		error = (distance - distanceTravelled)*inverted;// Drive PID error
 
@@ -263,7 +270,7 @@ void liftPID(int distance)
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE && SensorValue[S1] == 0)
+	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE && SensorValue[TOUCH_PORT] == 0)
 	{
 		error = distance - nMotorEncoder[MOTOR_LIFT]/TICK_TO_CM;
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
@@ -277,7 +284,6 @@ void liftPID(int distance)
 // -
 void returnToOrigin()
 {
-	displayString(5, "rotating");
 	rotateAbsolute(180);
 
 	float angle = 0;
