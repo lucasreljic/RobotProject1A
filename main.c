@@ -11,25 +11,26 @@ void configureSensors();
 int rotateRobot(int angle);
 void driveUltrasonic(int distance);
 void correctiveDrive(int distance);
-void LiftPID(int distance);
+void liftPID(int distance);
 void driveBoth(int pwrL, int pwrR);
 void drive(int pwr);
 int rotateAbsolute(int angle);
 int getMuxSensorValue(int i);
-void triangulate ();
+void triangulate();
 void returnToOrigin();
-//start of code
+
 
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
 const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
 const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
-//const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
+const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
 const float DEG_TO_RAD = PI/180;
 const float RAD_TO_DEG = 180/PI;
 const float ULTRA_DEG = 12;
 const float SENSOR_OFFSET = 5;
+const float TRI_LENGTH_B = 20;
 
 
 // sensor constants
@@ -40,10 +41,9 @@ const int COLOR_PORT = 2;
 const int GYRO_PORT = (int) S4;
 
 
-
-
 tMSEV3 muxedSensor[3];
 tEV3SensorTypeMode typeMode[3] = {sonarCM, sonarCM, colorMeasureColor};
+
 
 // tracks position (x and y coordinates) in cm
 typedef struct
@@ -51,10 +51,10 @@ typedef struct
 	float x;
 	float y;
 } Position;
-
-
 // tracks position of robot
 Position robotPos;
+
+
 
 task main()
 {
@@ -88,6 +88,8 @@ task main()
 	}
 }
 
+
+// -
 int getMuxSensorValue(int i)
 {
 	sleep(100);//wait for i2c port
@@ -100,6 +102,8 @@ int getMuxSensorValue(int i)
 	return -1;
 }
 
+
+// -
 void configureSensors()
 {
 	SensorType[LEFT_ULTRA_PORT] = sensorSONAR;
@@ -160,6 +164,7 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 }
 
 
+// -
 int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
 	const float KP = 0.5;//0.26
@@ -181,26 +186,28 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 	return abs(getGyroDegrees(GYRO_PORT));
 }
 
-const float triLengthB = 20;
 
+// -
 void triangulate()
+{
+    int triLengthA = SensorValue[LEFT_ULTRA_PORT];
+    int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
+    if(triLengthA == 0 || triLengthC == 0)
+    	writeDebugStreamLine("ERROR");
+    if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
     {
-        int triLengthA = SensorValue[LEFT_ULTRA_PORT];
-        int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
-        if(triLengthA == 0 || triLengthC == 0)
-        	writeDebugStreamLine("ERROR");
-        if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
-        {
-        	float gammaInit = (acos((pow(triLengthA, 2) + pow(triLengthB, 2) - pow(triLengthC, 2))/(2*triLengthA*triLengthB)))/DEG_TO_RAD;
-        	float avgTriLength = (triLengthA + triLengthC)/2;
-        	float gammaFinal = acos(triLengthB/(2*avgTriLength))/DEG_TO_RAD;
-        	int deltaGamma = ceil(gammaInit - gammaFinal);
-        	if(abs(deltaGamma) < 90)
-        		{
-        		rotateRobot(deltaGamma);
-      			}
-      	}
-    }
+    	float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
+    	float avgTriLength = (triLengthA + triLengthC)/2;
+    	float gammaFinal = acos(TRI_LENGTH_B/(2*avgTriLength))/DEG_TO_RAD;
+    	int deltaGamma = ceil(gammaInit - gammaFinal);
+    	if(abs(deltaGamma) < 90)
+    		{
+    		rotateRobot(deltaGamma);
+  			}
+  	}
+}
+
+
 // -
 void driveUltrasonic(int distance)
 {
@@ -301,7 +308,7 @@ void correctiveDrive(int distance)
 
 
 // -
-void LiftPID(int distance)
+void liftPID(int distance)
 {
 	const float KP = 0.85;
 	const float KI = 0.005;
@@ -323,6 +330,7 @@ void LiftPID(int distance)
 }
 
 
+// -
 void returnToOrigin()
 {
 	rotateAbsolute(180);
