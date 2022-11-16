@@ -7,25 +7,36 @@
 #include "EV3Servo-lib-UW.c"
 #include "EV3Multiplex.c"
 
-void configureSensors();
-int rotateRobot(int angle);
-void driveUltrasonic(int distance);
-void correctiveDrive(int distance);
-void liftPID(int distance);
-void driveBoth(int pwrL, int pwrR);
-void drive(int pwr);
-int rotateAbsolute(int angle);
+
+// class for position (x,y)
+typedef struct
+{
+	float x;
+	float y;
+} Position;
+
+
+// function prototypes
 int getMuxSensorValue(int i);
+void configureSensors();
+void drive(int pwr);
+void driveBoth(int pwrL, int pwrR);
+int rotateRobot(int angle);
+int rotateAbsolute(int angle);
 void triangulate();
-void returnToOrigin();
+void driveUltrasonic(int distance, Position *robotPos );
+void correctiveDrive(int distance, Position *robotPos);
+void liftPID(int distance);
+void returnToOrigin(Position *robotPos);
 
 
+// constants
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
 const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
-const float TICK_TO_CM = 180/(PI*1.6);//Encoder ticks to CM calculation
-const float CM_TO_TICK = (PI*1.6)/180;//Encoder ticks to CM calculation
+const float TICK_TO_CM = 180/(PI*1.6);
+const float CM_TO_TICK = (PI*1.6)/180;
 const float DEG_TO_RAD = PI/180;
 const float RAD_TO_DEG = 180/PI;
 const float ULTRA_DEG = 12;
@@ -33,7 +44,7 @@ const float SENSOR_OFFSET = 5;
 const float TRI_LENGTH_B = 20;
 
 
-// sensor constants
+// sensors
 const int RIGHT_ULTRA_PORT = 0;
 const int SIDE_ULTRA_PORT = 1;
 const int LEFT_ULTRA_PORT = (int) S3;
@@ -45,21 +56,10 @@ tMSEV3 muxedSensor[3];
 tEV3SensorTypeMode typeMode[3] = {sonarCM, sonarCM, colorMeasureColor};
 
 
-// tracks position (x and y coordinates) in cm
-typedef struct
-{
-	float x;
-	float y;
-} Position;
-// tracks position of robot
-Position robotPos;
-
-
-
 task main()
 {
-
 	clearDebugStream();
+
 	configureSensors();
 	if (!initSensor(&muxedSensor[0], msensor_S1_1, typeMode[0]))
   	writeDebugStreamLine("initSensor() failed! for msensor_S1_1");
@@ -69,8 +69,12 @@ task main()
 
   if (!initSensor(&muxedSensor[2], msensor_S1_3, typeMode[2]))
   	writeDebugStreamLine("initSensor() failed! for msensor_S1_3");
+
+	// tracks position of robot
+	Position robotPos;
 	robotPos.x = 0;
 	robotPos.y = 0;
+
 
 	while (!getButtonPress(buttonEnter))
 	{
@@ -78,15 +82,18 @@ task main()
 		{}
 
 		if (getButtonPress(buttonLeft))
-			rotateRobot(10);
+			rotateRobot(30);
 		else if (getButtonPress(buttonRight))
-			rotateRobot(-10);
+			rotateRobot(-30);
 		else if (getButtonPress(buttonUp))
-			correctiveDrive(-30);
+			correctiveDrive(-30, &robotPos);
 		else if (getButtonPress(buttonDown))
-			returnToOrigin();
+			returnToOrigin(&robotPos);
 	}
 }
+
+
+
 
 
 // -
@@ -209,7 +216,7 @@ void triangulate()
 
 
 // -
-void driveUltrasonic(int distance)
+void driveUltrasonic(int distance, Position *robotPos)
 {
 
 	nMotorEncoder[motorA] = 0;
@@ -233,16 +240,16 @@ void driveUltrasonic(int distance)
 	{
 		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT);
 		drive(0);
-		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance);
+		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance, &*robotPos);
 		rotateRobot(-90);
-		correctiveDrive(sensorDistance);
+		correctiveDrive(sensorDistance, &*robotPos);
 	}
 	drive(0);
 }
 
 
 // -
-void correctiveDrive(int distance)
+void correctiveDrive(int distance, Position *robotPos)
 {
 
 	//Driving PID Constants
@@ -296,12 +303,12 @@ void correctiveDrive(int distance)
 	rotateAbsolute(ANGLE);
 	drive(0);// stop motors
 
-	robotPos.x += cos((ANGLE)*DEG_TO_RAD)*-distance;
-	robotPos.y += sin((ANGLE)*DEG_TO_RAD)*-distance;
+	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*-distance;
+	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*-distance;
 
 
-	displayString(1, "x: %f", robotPos.x);
-	displayString(2, "y: %f", robotPos.y);
+	displayString(1, "x: %f", (*robotPos).x);
+	displayString(2, "y: %f", (*robotPos).y);
 	displayString(3, "xcur: %f", cos(ANGLE*DEG_TO_RAD)*distance);
 	displayString(4, "ycur: %f", sin(ANGLE*DEG_TO_RAD)*distance);
 }
@@ -331,16 +338,16 @@ void liftPID(int distance)
 
 
 // -
-void returnToOrigin()
+void returnToOrigin(Position *robotPos)
 {
 	rotateAbsolute(180);
 
 	float angle = 0;
-	angle = robotPos.x==0? 90 : atan(robotPos.y/robotPos.x)*RAD_TO_DEG;
+	angle = (*robotPos).x==0? 90 : atan((*robotPos).y/(*robotPos).x)*RAD_TO_DEG;
 	displayString(7, "angle: %f", angle);
 
 	rotateRobot(angle);
-	correctiveDrive( -sqrt(pow(robotPos.x, 2) + pow(robotPos.y, 2)) );
+	correctiveDrive( -sqrt(pow((*robotPos).x, 2) + pow((*robotPos).y, 2)) , &*robotPos);
 
 	rotateAbsolute(0);
 }
