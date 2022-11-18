@@ -82,9 +82,9 @@ task main()
 		{}
 
 		if (getButtonPress(buttonLeft))
-			rotateRobot(30);
+			rotateRobot(90);
 		else if (getButtonPress(buttonRight))
-			rotateRobot(-30);
+			rotateRobot(-90);
 		else if (getButtonPress(buttonUp))
 			correctiveDrive(-30, &robotPos);
 		else if (getButtonPress(buttonDown))
@@ -143,18 +143,28 @@ void driveBoth(int pwrL, int pwrR)
 // -
 int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
 {
-	int lastGyro = getGyroDegrees(GYRO_PORT);
+	int startAngle = getGyroDegrees(GYRO_PORT);
 	const float KP = 0.5;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
-	const float TOLERANCE = 0.25;
-	float error = angle - (getGyroDegrees(GYRO_PORT)-lastGyro);
+	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)-lastGyro) - angle) > TOLERANCE)
+
+	writeDebugStreamLine("current angle n: %f", startAngle);
+	writeDebugStreamLine("target angle: %f", (getGyroDegrees(GYRO_PORT)-startAngle));
+
+	bool positive = angle>0? true: false;
+	while ( !getButtonPress(buttonEnter)
+				  && abs((getGyroDegrees(GYRO_PORT)-startAngle) - angle) > 0
+				  && (  positive*(getGyroDegrees(GYRO_PORT)-startAngle<angle)   ||    (!positive)*(getGyroDegrees(GYRO_PORT)-startAngle>angle)  )
+				 )
 	{
-		error = abs(angle - (getGyroDegrees(GYRO_PORT)-lastGyro));
+
+		writeDebugStreamLine("status: %f", ((getGyroDegrees(GYRO_PORT)-startAngle) - angle));
+
+		error = abs(angle - (getGyroDegrees(GYRO_PORT)-startAngle));
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
 		if (angle>0)
 		{
@@ -177,14 +187,28 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 	const float KP = 0.5;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
-	const float TOLERANCE = 0.25;
 	float error = angle - (getGyroDegrees(GYRO_PORT));//
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;// reset timer for PID loop
-	while (!getButtonPress(buttonEnter) && abs((getGyroDegrees(GYRO_PORT)) - angle) > TOLERANCE)
+
+	writeDebugStreamLine("target: %f:", angle);
+
+	bool positive = (getGyroDegrees(GYRO_PORT) - angle)>0? true : false;
+	angle = angle>0? abs(angle)%360 : -abs(angle)%360;
+
+	while (!getButtonPress(buttonEnter)
+				 && abs(getGyroDegrees(GYRO_PORT) - angle)%360 > 0
+				 && (  positive*((getGyroDegrees(GYRO_PORT)-angle)%360>0)   ||    (!positive)*((getGyroDegrees(GYRO_PORT)-angle)%360<0)  )
+				)
 	{
-		error = angle - getGyroDegrees(GYRO_PORT);// error for turn PID
+
+		writeDebugStreamLine("approach: %d:", (getGyroDegrees(GYRO_PORT) - angle)%360);
+		writeDebugStreamLine("current: %d:", getGyroDegrees(GYRO_PORT));
+		writeDebugStreamLine("currentmod: %d:", getGyroDegrees(GYRO_PORT)%360);
+
+
+		error = angle>0? abs((angle - getGyroDegrees(GYRO_PORT)))%360 : -abs((angle - getGyroDegrees(GYRO_PORT)))%360;// error for turn PID
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
 		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
 		prevError = error;// previous error for PID
@@ -197,21 +221,21 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 // -
 void triangulate()
 {
-    int triLengthA = SensorValue[LEFT_ULTRA_PORT];
-    int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
-    if(triLengthA == 0 || triLengthC == 0)
-    	writeDebugStreamLine("ERROR");
-    if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
-    {
-    	float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
-    	float avgTriLength = (triLengthA + triLengthC)/2;
-    	float gammaFinal = acos(TRI_LENGTH_B/(2*avgTriLength))/DEG_TO_RAD;
-    	int deltaGamma = ceil(gammaInit - gammaFinal);
-    	if(abs(deltaGamma) < 90)
-    		{
-    		rotateRobot(deltaGamma);
-  			}
-  	}
+  int triLengthA = SensorValue[LEFT_ULTRA_PORT];
+  int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
+  if(triLengthA == 0 || triLengthC == 0)
+  	writeDebugStreamLine("ERROR");
+  if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
+  {
+  	float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
+  	float avgTriLength = (triLengthA + triLengthC)/2;
+  	float gammaFinal = acos(TRI_LENGTH_B/(2*avgTriLength))/DEG_TO_RAD;
+  	int deltaGamma = ceil(gammaInit - gammaFinal);
+  	if(abs(deltaGamma) < 90)
+		{
+		rotateRobot(deltaGamma);
+		}
+	}
 }
 
 
@@ -306,11 +330,10 @@ void correctiveDrive(int distance, Position *robotPos)
 	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*-distance;
 	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*-distance;
 
-
-	displayString(1, "x: %f", (*robotPos).x);
-	displayString(2, "y: %f", (*robotPos).y);
-	displayString(3, "xcur: %f", cos(ANGLE*DEG_TO_RAD)*distance);
-	displayString(4, "ycur: %f", sin(ANGLE*DEG_TO_RAD)*distance);
+	writeDebugStreamLine("x change: %f", cos((ANGLE)*DEG_TO_RAD)*-distance);
+	writeDebugStreamLine("y change: %f", sin((ANGLE)*DEG_TO_RAD)*-distance);
+	writeDebugStreamLine("x pos: %f", (*robotPos).x);
+	writeDebugStreamLine("y pos: %f", (*robotPos).y);
 }
 
 
@@ -343,8 +366,8 @@ void returnToOrigin(Position *robotPos)
 	rotateAbsolute(180);
 
 	float angle = 0;
-	angle = (*robotPos).x==0? 90 : atan((*robotPos).y/(*robotPos).x)*RAD_TO_DEG;
-	displayString(7, "angle: %f", angle);
+
+	angle = (*robotPos).x==0? 90 : atan2((*robotPos).y,(*robotPos).x)*RAD_TO_DEG;
 
 	rotateRobot(angle);
 	correctiveDrive( -sqrt(pow((*robotPos).x, 2) + pow((*robotPos).y, 2)) , &*robotPos);
