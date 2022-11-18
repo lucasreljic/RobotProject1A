@@ -152,18 +152,12 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 	float prevError = 0;
 	time1[T1] = 0;
 
-	writeDebugStreamLine("current angle n: %f", startAngle);
-	writeDebugStreamLine("target angle: %f", (getGyroDegrees(GYRO_PORT)-startAngle));
-
 	bool positive = angle>0? true: false;
 	while ( !getButtonPress(buttonEnter)
 				  && abs((getGyroDegrees(GYRO_PORT)-startAngle) - angle) > 0
 				  && (  positive*(getGyroDegrees(GYRO_PORT)-startAngle<angle)   ||    (!positive)*(getGyroDegrees(GYRO_PORT)-startAngle>angle)  )
 				 )
 	{
-
-		writeDebugStreamLine("status: %f", ((getGyroDegrees(GYRO_PORT)-startAngle) - angle));
-
 		error = abs(angle - (getGyroDegrees(GYRO_PORT)-startAngle));
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
 		if (angle>0)
@@ -192,23 +186,13 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 	float prevError = 0;
 	time1[T1] = 0;// reset timer for PID loop
 
-	writeDebugStreamLine("target: %f:", angle);
-
 	bool positive = (getGyroDegrees(GYRO_PORT) - angle)>0? true : false;
-	angle = angle>0? abs(angle)%360 : -abs(angle)%360;
-
 	while (!getButtonPress(buttonEnter)
-				 && abs(getGyroDegrees(GYRO_PORT) - angle)%360 > 0
-				 && (  positive*((getGyroDegrees(GYRO_PORT)-angle)%360>0)   ||    (!positive)*((getGyroDegrees(GYRO_PORT)-angle)%360<0)  )
+				 && abs(getGyroDegrees(GYRO_PORT) - angle) > 0
+				 && (  positive*((getGyroDegrees(GYRO_PORT)-angle)>0)   ||    (!positive)*((getGyroDegrees(GYRO_PORT)-angle)<0)  )
 				)
 	{
-
-		writeDebugStreamLine("approach: %d:", (getGyroDegrees(GYRO_PORT) - angle)%360);
-		writeDebugStreamLine("current: %d:", getGyroDegrees(GYRO_PORT));
-		writeDebugStreamLine("currentmod: %d:", getGyroDegrees(GYRO_PORT)%360);
-
-
-		error = angle>0? abs((angle - getGyroDegrees(GYRO_PORT)))%360 : -abs((angle - getGyroDegrees(GYRO_PORT)))%360;// error for turn PID
+		error = angle - getGyroDegrees(GYRO_PORT);// error for turn PID
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
 		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
 		prevError = error;// previous error for PID
