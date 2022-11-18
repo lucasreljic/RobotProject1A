@@ -27,7 +27,7 @@ void triangulate();
 void driveUltrasonic(int distance, Position *robotPos );
 void correctiveDrive(int distance, Position *robotPos);
 void liftPID(int distance);
-void returnToOrigin(Position *robotPos);
+void driveToPos(Position targetPos, Position *robotPos, int finalRotation=0);
 
 
 // constants
@@ -81,14 +81,10 @@ task main()
 		while(!getButtonPress(buttonAny))
 		{}
 
-		if (getButtonPress(buttonLeft))
-			rotateRobot(90);
-		else if (getButtonPress(buttonRight))
-			rotateRobot(-90);
-		else if (getButtonPress(buttonUp))
-			correctiveDrive(-30, &robotPos);
-		else if (getButtonPress(buttonDown))
-			returnToOrigin(&robotPos);
+		if (getButtonPress(buttonUp))
+		{
+			driveUltrasonic(-75, &robotPos);
+		}
 	}
 }
 
@@ -229,7 +225,7 @@ void driveUltrasonic(int distance, Position *robotPos)
 
 	nMotorEncoder[motorA] = 0;
 	const float TOLERANCE = 0.5;
-	float error = distance - nMotorEncoder[motorA]*TICK_TO_CM;
+	float error = distance;
 	int inverted = 1;
 	float sensorDistance = 0;
 	float threshold = getMuxSensorValue(SIDE_ULTRA_PORT) - 5;
@@ -242,7 +238,11 @@ void driveUltrasonic(int distance, Position *robotPos)
 		}
 
 		error = distance - (nMotorEncoder[motorA]/TICK_TO_CM)*inverted;
-		drive(20*inverted);
+		drive(error*inverted);
+	if(distance < (nMotorEncoder[motorA]/TICK_TO_CM)*inverted)
+	{
+		inverted *=-1;
+	}
 	}
 	if(getMuxSensorValue(SIDE_ULTRA_PORT) < threshold)
 	{
@@ -345,16 +345,21 @@ void liftPID(int distance)
 
 
 // -
-void returnToOrigin(Position *robotPos)
+void driveToPos(Position targetPos, Position *robotPos, int finalRotation)
 {
+
 	rotateAbsolute(180);
 
 	float angle = 0;
 
-	angle = (*robotPos).x==0? 90 : atan2((*robotPos).y,(*robotPos).x)*RAD_TO_DEG;
+	Position posRelative;
+	posRelative.x = (*robotPos).x - targetPos.x;
+	posRelative.y = (*robotPos).y - targetPos.y;
+
+	angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
 
 	rotateRobot(angle);
-	correctiveDrive( -sqrt(pow((*robotPos).x, 2) + pow((*robotPos).y, 2)) , &*robotPos);
+	correctiveDrive( -sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
 
-	rotateAbsolute(0);
+	rotateAbsolute(finalRotation);
 }
