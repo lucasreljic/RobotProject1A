@@ -83,7 +83,8 @@ task main()
 		if (getButtonPress(buttonLeft))
 			rotateRobot(10);
 		else if (getButtonPress(buttonRight))
-			rotateRobot(-10);
+			//rotateRobot(-10);
+			triangulate();
 		else if (getButtonPress(buttonUp))
 			correctiveDrive(-30);
 		else if (getButtonPress(buttonDown))
@@ -117,7 +118,7 @@ void mainProgram()
 		returnToOrigin();
 	}
 
-	emergShutdown();
+	//emergShutdown();
 }
 
 int pickUpObject()
