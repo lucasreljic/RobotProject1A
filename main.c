@@ -19,6 +19,7 @@ int getMuxSensorValue(int i);
 void triangulate ();
 void returnToOrigin();
 int pickUpObject();
+void mainProgram();
 //start of code
 
 const int MOTOR_LEFT = motorD;
@@ -78,15 +79,19 @@ task main()
 	while (!getButtonPress(buttonEnter))
 	{
 		while(!getButtonPress(buttonAny))
-		{}
+		{
+		writeDebugStreamLine("Left: %i", SensorValue[LEFT_ULTRA_PORT]/2);
+		writeDebugStreamLine("Right: %i", getMuxSensorValue(RIGHT_ULTRA_PORT)/20);
+		}
 
 		if (getButtonPress(buttonLeft))
 			rotateRobot(10);
 		else if (getButtonPress(buttonRight))
 			//rotateRobot(-10);
 			triangulate();
+			//LiftPID(-20);
 		else if (getButtonPress(buttonUp))
-			correctiveDrive(-30);
+			mainProgram();
 		else if (getButtonPress(buttonDown))
 			returnToOrigin();
 	}
@@ -265,21 +270,37 @@ const float triLengthB = 20;
 
 void triangulate()
     {
-        int triLengthA = SensorValue[LEFT_ULTRA_PORT];
-        int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
-        if(triLengthA == 0 || triLengthC == 0)
-        	writeDebugStreamLine("ERROR");
-        if (triLengthA < 30 && triLengthC < 30 && triLengthA != 0 && triLengthC != 0)
-        {
+			int triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
+      int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
+      float avgTriLength = 0;
+      int count = 0;
+      if(triLengthA == 0 || triLengthC == 0)
+      	writeDebugStreamLine("ERROR");
+     	while (triLengthA != avgTriLength && count != 10)
+     	 {
+     	 triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
+       triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
+       if(triLengthA == 0 || triLengthC == 0)
+       	writeDebugStreamLine("ERROR");
+       if (triLengthA < 50 && triLengthC < 50 && triLengthA != 0 && triLengthC != 0 && triLengthB + triLengthC > triLengthA)
+       	{
         	float gammaInit = (acos((pow(triLengthA, 2) + pow(triLengthB, 2) - pow(triLengthC, 2))/(2*triLengthA*triLengthB)))/DEG_TO_RAD;
-        	float avgTriLength = (triLengthA + triLengthC)/2;
+        	writeDebugStreamLine("Gamma init: %d",gammaInit);
+          avgTriLength = (triLengthA + triLengthC)/2;
         	float gammaFinal = acos(triLengthB/(2*avgTriLength))/DEG_TO_RAD;
-        	int deltaGamma = ceil(gammaInit - gammaFinal);
+        	writeDebugStreamLine("Gamma final: %d",gammaInit);
+        	float deltaGamma = (gammaInit - gammaFinal);
         	if(abs(deltaGamma) < 90)
         		{
         		rotateRobot(deltaGamma);
       			}
+      		writeDebugStreamLine("rotated: %d", deltaGamma)
       	}
+      	count++;
+      	writeDebugStreamLine("inner loop");
+      	writeDebugStreamLine("Left: %i", SensorValue[LEFT_ULTRA_PORT]/2);
+				writeDebugStreamLine("Right: %i", getMuxSensorValue(RIGHT_ULTRA_PORT)/20);
+       }
     }
 // -
 void driveUltrasonic(int distance)
