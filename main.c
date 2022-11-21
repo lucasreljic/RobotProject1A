@@ -13,6 +13,7 @@ void LiftPID(int distance);
 void driveBoth(int pwrL, int pwrR);
 void drive(int pwr);
 int rotateAbsolute(int angle);
+const int MAX_LIFT = 22;
 
 
 task main()
@@ -20,13 +21,18 @@ task main()
 	clearDebugStream();
 	configureSensors();
 
+	int count = 22;
 	while (true)
 	{
 		while(!getButtonPress(buttonAny))
 		{}
 
 		if (getButtonPress(buttonLeft))
-			LiftPID(-20);
+		{
+			LiftPID(count);
+			displayString(5, "%i", count);
+			LiftPID(0);
+		}
 		else if (getButtonPress(buttonRight))
 			LiftPID(20);
 		else if (getButtonPress(buttonUp))
@@ -205,23 +211,21 @@ void drive(int pwr)
 }
 void LiftPID(int distance)
 {
+	distance *= -1;
 	const float kP = 0.85;
 	const float kI = 0.005;
 	const float kD = 0.05;
 	const float TickToCM = 180/(PI*1);
 	const float tolerance = 0.5;
-	nMotorEncoder[MOTOR_LIFT] = 0;
 	float error = distance - nMotorEncoder[MOTOR_LIFT]*TickToCM;
 	displayString(5, "%f",error);
 	float mPower = 0;
 	float prevError = 0;
 	time1[T1] = 0;
-	while (!getButtonPress(buttonEnter) && abs(error) > tolerance && SensorValue[S1] == 0)
+	while (!getButtonPress(buttonEnter) && abs(error) > tolerance)
 	{
 		error = distance - nMotorEncoder[MOTOR_LIFT]/TickToCM;
 		mPower = kP*error + kI*((error+prevError)*(time1[T1] + 1)/2) + kD*abs(((error-prevError)/(time1[T1] + 1)));
-		displayString(7, "%f",mPower);
-		displayString(5, "%f",error);
 		motor[MOTOR_LIFT] = mPower;
 		prevError = error;
 	}
