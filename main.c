@@ -90,7 +90,7 @@ task main()
 		if (getButtonPress(buttonLeft))
 		{
 			//mainProgram(robotPos);
-			driveUltrasonic(30, robotPos);
+			driveUltrasonic(75, robotPos);
 			triangulate(robotPos);
 		}
 	}
@@ -285,17 +285,20 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	float error = 0;
 	const float RANGE = 80;
 	const float TOLERANCE = 0.5;
-	while (!getButtonPress(buttonEnter) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
+	float currentEncoderValue = nMotorEncoder[motorA];
+	drive(-30);
+	while (!getButtonPress(buttonEnter) && abs((nMotorEncoder[motorA] - currentEncoderValue)/TICK_TO_CM) < abs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
-		error = (SQUARE_LENGTH*inverted + initDistance) - nMotorEncoder[motorA];
-		driveBoth(error, error);
 
-		// fix reversing direction, hopefully this fixes it
-		if(error < TOLERANCE)
-		{
-			driveBoth(0,0);
-			inverted *= -1;
-		}
+		//error = (SQUARE_LENGTH*inverted + initDistance) - nMotorEncoder[motorA];
+		//driveBoth(error, error);
+
+		//// fix reversing direction, hopefully this fixes it
+		//if(error < TOLERANCE)
+		//{
+		//	driveBoth(0,0);
+		//	inverted *= -1;
+		//}
 		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
 
 	}
@@ -311,7 +314,12 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		correctiveDrive(offset, &*robotPos);
 		rotateRobot(90);
 		float objDist = sqrt (pow (offset, 2) + pow(sensorDistance, 2));
-		correctiveDrive(objDist-TRI_OFFSET, &*robotPos);
+		float objDistTravel = objDist-TRI_OFFSET;
+		if(TRI_OFFSET > objDist)
+		{
+			objDistTravel = 0;
+		}
+		correctiveDrive(objDistTravel, &*robotPos);
 		return(true);
 	}
 	//writeDebugStreamLine("not funny")
