@@ -48,7 +48,7 @@ const float SENSOR_OFFSET = 5;
 const float CLAW_OFFSET = 5;
 const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
-
+const int SQUARE_LENGTH = 75;
 
 // sensors
 const int RIGHT_ULTRA_PORT = 0;
@@ -95,17 +95,17 @@ task main()
 }
 
 
-// -
+// Main Logic of program
 void mainProgram(Position *robotPos)
 {
 	bool failed = false;
 	liftPID(20);
 	int count = 0;
-	while (!getButtonPress(buttonEnter) || count < 2 || failed == false)
+	while (!getButtonPress(buttonEnter) && (count < 2 || failed == false))
 	{
 		count = 0;
 	  bool detected = false;
-		while(count < 2 || detected == true)
+		while(!getButtonPress(buttonEnter) && (count < 2 || detected == true))
 		{
 			detected = driveUltrasonic(75, &*robotPos);
 			detected = driveUltrasonic(-75, &*robotPos);
@@ -125,11 +125,11 @@ void mainProgram(Position *robotPos)
 		driveToPos(origin, &*robotPos);
 	}
 
-	emergShutdown();
+	emergShutdown();// in case button enter is pressed or program ends
 }
 
 
-// -
+// Reading from the Multiplexer (int i) is the port number of the sensor
 int getMuxSensorValue(int i)
 {
 	sleep(100);//wait for i2c port
@@ -143,7 +143,7 @@ int getMuxSensorValue(int i)
 }
 
 
-// -
+// Configures all the sensors connected directly to the EV3
 void configureSensors()
 {
 	SensorType[LEFT_ULTRA_PORT] = sensorSONAR;
@@ -157,14 +157,14 @@ void configureSensors()
 }
 
 
-// -
+// Drive both motors at the same power
 void drive(int pwr)
 {
 	motor[MOTOR_LEFT] = motor[MOTOR_RIGHT] = pwr;
 }
 
 
-// -
+// Drive each side individually
 void driveBoth(int pwrL, int pwrR)
 {
 	motor[MOTOR_LEFT] = pwrL;
@@ -172,8 +172,8 @@ void driveBoth(int pwrL, int pwrR)
 }
 
 
-// -
-int rotateRobot(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
+// Rotates the robot an angle relative to its current angle, positive angles are clockwise when viewed from above
+int rotateRobot(int angle)
 {
 	int startAngle = getGyroDegrees(GYRO_PORT);
 	const float KP = 0.5;//0.26
@@ -207,8 +207,8 @@ int rotateRobot(int angle) //rotates robot in place to given angle then stops. P
 }
 
 
-// -
-int rotateAbsolute(int angle) //rotates robot in place to given angle then stops. Positive angles are clockwise when viewed from above
+// Rotates the robot to an angle relative to the initial gyro zeroing when program starts, positive angles are clockwise when viewed from above
+int rotateAbsolute(int angle)
 {
 	const float KP = 0.5;//0.26
 	const float KI = 0.001;//0.0008
@@ -244,7 +244,7 @@ void triangulate()
   if(triLengthA == 0 || triLengthC == 0)
   	writeDebugStreamLine("ERROR");
 
- 	while (triLengthA != avgTriLength && count != 10)
+ 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && count != 10)
  	{
 		triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
 		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
@@ -276,17 +276,26 @@ void triangulate()
 // -
 bool driveUltrasonic(int distance, Position *robotPos)
 {
-
-	nMotorEncoder[motorA] = 0;
+	float initDistance	= nMotorEncoder[motorA];
 	int inverted = 1;
 	float sensorDistance = 0;
+	float error = 0;
 	const float RANGE = 80;
-
-	drive(20); // PROBLEM: drive() doesn't track position -- must be integrated
+	const float TOLERANCE = 0.5;
 	while (!getButtonPress(buttonEnter) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
-		// fix reversing direction
+		error = (SQUARE_LENGTH*inverted + initDistance) - nMotorEncoder[motorA];
+		driveBoth(error, error);
+
+		// fix reversing direction, hopefully this fixes it
+		if(error < TOLERANCE)
+		{
+			driveBoth(0,0);
+			inverted *= -1;
+		}
+
 	}
+	float distanceTravelled = nMotorEncoder[motorA] - initDistance;	// this is for tracking position currently not used
 
 	// when an object is spotted
 	if(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE)
