@@ -24,7 +24,7 @@ void drive(int pwr);
 void driveBoth(int pwrL, int pwrR);
 int rotateRobot(int angle);
 int rotateAbsolute(int angle);
-void triangulate();
+void triangulate(Position *robotPos);
 bool driveUltrasonic(int distance, Position *robotPos);
 void correctiveDrive(int distance, Position *robotPos);
 void liftPID(int distance);
@@ -86,10 +86,12 @@ task main()
 	while (!getButtonPress(buttonEnter))
 	{
 		while(!getButtonPress(buttonAny))
-		{}
+		{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
 		if (getButtonPress(buttonLeft))
 		{
-			mainProgram(robotPos);
+			//mainProgram(robotPos);
+			driveUltrasonic(30, robotPos);
+			triangulate(robotPos);
 		}
 	}
 }
@@ -112,8 +114,8 @@ void mainProgram(Position *robotPos)
 			count++;
 		}
 		sleep(1000);
-		triangulate();
-		correctiveDrive(TRI_OFFSET + CLAW_OFFSET, &*robotPos);
+		triangulate(robotPos);
+		//correctiveDrive(TRI_OFFSET + CLAW_OFFSET, &*robotPos);
 		int objectColor = pickUpObject();
 		if (objectColor == -1)
 			failed = true;
@@ -235,7 +237,7 @@ int rotateAbsolute(int angle) //rotates robot in place to given angle then stops
 
 
 // -
-void triangulate()
+void triangulate(Position *robotPos)
 {
 	int triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
   int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
@@ -270,6 +272,7 @@ void triangulate()
 		writeDebugStreamLine("Left: %i", SensorValue[LEFT_ULTRA_PORT]/2);
 		writeDebugStreamLine("Right: %i", getMuxSensorValue(RIGHT_ULTRA_PORT)/20);
 	}
+	correctiveDrive(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2)), robotPos);
 }
 
 
@@ -282,22 +285,26 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	float sensorDistance = 0;
 	const float RANGE = 80;
 
-	drive(20); // PROBLEM: drive() doesn't track position -- must be integrated
+	drive(-20); // PROBLEM: drive() doesn't track position -- must be integrated
 	while (!getButtonPress(buttonEnter) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
-		// fix reversing direction
+		writeDebugStreamLine("%i", getMuxSensorValue(SIDE_ULTRA_PORT)/10);
+		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
 	}
-
 	// when an object is spotted
 	if(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE)
 	{
-		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT);
 		drive(0);
-		correctiveDrive(SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance, &*robotPos);
-		rotateRobot(-90);
-		correctiveDrive(sensorDistance, &*robotPos);
+		writeDebugStreamLine("sensor dist: %f", sensorDistance);
+		float offset = SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance;
+		writeDebugStreamLine("Distance to travel back: %f", offset);
+		correctiveDrive(offset, &*robotPos);
+		rotateRobot(90);
+		float objDist = sqrt (pow (offset, 2) + pow(sensorDistance, 2));
+		correctiveDrive(objDist-TRI_OFFSET, &*robotPos);
 		return(true);
 	}
+	//writeDebugStreamLine("not funny")
 	drive(0);
 	return (false);
 }
@@ -307,6 +314,8 @@ bool driveUltrasonic(int distance, Position *robotPos)
 void correctiveDrive(int distance, Position *robotPos)
 {
 
+	//Only works when distance is negative
+	distance *= -1
 	//Driving PID Constants
 	const float KP = 1;
 	const float KI = 0.001;
