@@ -41,16 +41,16 @@ const int MOTOR_LIFT = motorC;
 const int MAX_POWER = 70;
 const float TICK_TO_CM = 180/(PI*1.6);
 //const float CM_TO_TICK = (PI*1.6)/180;
-const float DEG_TO_RAD = PI/180;
+const float DEG_TO_RAD = PI/180.0;
 const float RAD_TO_DEG = 180/PI;
 const float ULTRA_DEG = 12;
 const float SENSOR_OFFSET = 5;
 const float CLAW_OFFSET = 5;
-const int GRIP_LENGTH = 7;
+const int GRIP_LENGTH = 10;
 const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
 const int SQUARE_LENGTH = 100;
-const int MAX_LIFT = 22;
+const int MAX_LIFT = 25;
 
 // sensors
 const int RIGHT_ULTRA_PORT = 0;
@@ -84,20 +84,24 @@ task main()
 	robotPos.x = 0;
 	robotPos.y = 0;
 
+	setGripperPosition(GRIPPER_PORT, 5, 70);
+	liftPID(MAX_LIFT);
 
 	while (!getButtonPress(buttonEnter))
 	{
-		while(!getButtonPress(buttonAny))
-		{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
-		if (getButtonPress(buttonUp))
-		{
-			setGripperPosition(GRIPPER_PORT, 5, 70);
-			liftPID(MAX_LIFT);
-			//driveUltrasonic(SQUARE_LENGTH, &robotPos);
-			triangulate(&robotPos);
-			pickUpObject();
-			//mainProgram(robotPos);
-		}
+		triangulate();
+
+		//while(!getButtonPress(buttonAny))
+		//{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
+		//if (getButtonPress(buttonUp))
+		//{
+		//	setGripperPosition(GRIPPER_PORT, 5, 70);
+		//	liftPID(MAX_LIFT);
+		//	//driveUltrasonic(SQUARE_LENGTH, &robotPos);
+		//	triangulate(&robotPos);
+		//	pickUpObject();
+		//	//mainProgram(robotPos);
+		//}
 	}
 	emergShutdown();
 }
@@ -184,7 +188,7 @@ void driveBoth(int pwrL, int pwrR)
 int rotateRobot(int angle)
 {
 	int startAngle = getGyroDegrees(GYRO_PORT);
-	const float KP = 0.5;//0.26
+	const float KP = 0.26;//0.5
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
@@ -245,39 +249,40 @@ int rotateAbsolute(int angle)
 // -
 void triangulate(Position *robotPos)
 {
-	int triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
-  int triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
-  float avgTriLength = 0;
+	float triLengthA = SensorValue[LEFT_ULTRA_PORT];
+  float triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
   int count = 0;
+  float avgTriLength = 0;
   if(triLengthA == 0 || triLengthC == 0)
   	displayString(1, "ERROR");
 
- 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && count != 10)
+ 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 5)
  	{
-		triLengthA = SensorValue[LEFT_ULTRA_PORT]/2;
-		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/20;
+  	avgTriLength = 0;
+		triLengthA = SensorValue[LEFT_ULTRA_PORT];
+		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
 		if(triLengthA == 0 || triLengthC == 0)
 			displayString(1, "ERROR");
-		if (triLengthA < 50 && triLengthC < 50 && triLengthA != 0 && triLengthC != 0 && TRI_LENGTH_B + triLengthC > triLengthA)
+		if ((triLengthA < TRI_OFFSET-5 || triLengthC < TRI_OFFSET-5) && triLengthA != 0 && triLengthC != 0 && TRI_LENGTH_B + triLengthC > triLengthA)
 		{
 			float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
 			writeDebugStreamLine("Gamma init: %d",gammaInit);
 			avgTriLength = (triLengthA + triLengthC)/2;
-			float gammaFinal = acos(TRI_LENGTH_B/(2*avgTriLength))/DEG_TO_RAD;
+			float gammaFinal = (acos(TRI_LENGTH_B/(2*avgTriLength)))/DEG_TO_RAD;
 			writeDebugStreamLine("Gamma final: %d",gammaInit);
 			float deltaGamma = (gammaInit - gammaFinal);
-			displayString(4, "Gamma final: %d",gammaInit);
 
 			if(abs(deltaGamma) < 90)
 			{
-				rotateRobot(deltaGamma);
+				rotateRobot(deltaGamma/3);
 			}
-			writeDebugStreamLine("rotated: %d", deltaGamma);
+			displayString(4, "Gamma: %d",deltaGamma);
+		displayString(6, "inner loop");
+		displayString(7, "Left: %d", triLengthA);
+		displayString(8, "Right: %d", triLengthC);
 		}
 		count++;
-		displayString(6, "inner loop");
-		displayString(7, "Left: %i", SensorValue[LEFT_ULTRA_PORT]/2);
-		displayString(8, "Right: %i", getMuxSensorValue(RIGHT_ULTRA_PORT)/20);
+
 	}
 	correctiveDrive(abs(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2))), robotPos);
 }
@@ -458,7 +463,7 @@ int pickUpObject()
 {
 	setGripperPosition(GRIPPER_PORT, 5, 70);
 	liftPID(0);
-	setGripperPosition(GRIPPER_PORT, 5, 1);
+	setGripperPosition(GRIPPER_PORT, 5, 0);
 	liftPID(MAX_LIFT);
 	return getMuxSensorValue(COLOR_PORT);
 }

@@ -49,7 +49,7 @@ const float CLAW_OFFSET = 5;
 const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
 const int SQUARE_LENGTH = 100;
-const int MAX_LIFT = 22;
+const int MAX_LIFT = 25;
 
 // sensors
 const int RIGHT_ULTRA_PORT = 0;
