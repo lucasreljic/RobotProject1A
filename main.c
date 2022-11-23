@@ -90,8 +90,9 @@ task main()
 		if (getButtonPress(buttonLeft))
 		{
 			//mainProgram(robotPos);
-			driveUltrasonic(75, robotPos);
-			triangulate(robotPos);
+			//driveUltrasonic(75, robotPos);
+			//triangulate(robotPos);
+			pickUpObject();
 		}
 	}
 }
