@@ -24,7 +24,7 @@ void drive(int pwr);
 void driveBoth(int pwrL, int pwrR);
 int rotateRobot(int angle);
 int rotateAbsolute(int angle);
-void triangulate(Position *robotPos);
+float triangulate(Position *robotPos);
 bool driveUltrasonic(int distance, Position *robotPos);
 void correctiveDrive(int distance, Position *robotPos);
 void liftPID(int distance);
@@ -89,22 +89,17 @@ task main()
 
 	if (!getButtonPress(buttonEnter))
 	{
-		triangulate(&robotPos);
-		//wait1Msec(1000);
-		//pickUpObject();
-		//wait1Msec(5000);
+		while(!getButtonPress(buttonAny))
+		{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
 
-		//while(!getButtonPress(buttonAny))
-		//{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
-		//if (getButtonPress(buttonUp))
-		//{
-		//	setGripperPosition(GRIPPER_PORT, 5, 70);
-		//	liftPID(MAX_LIFT);
-		//	//driveUltrasonic(SQUARE_LENGTH, &robotPos);
-		//	triangulate(&robotPos);
-		//	pickUpObject();
-		//	//mainProgram(robotPos);
-		//}
+		if (getButtonPress(buttonUp))
+		{
+			float dist = triangulate(&robotPos);
+			wait1Msec(1000);
+			correctiveDrive(dist, &robotPos);
+			pickUpObject();
+			//mainProgram(robotPos);
+		}
 	}
 	emergShutdown();
 }
@@ -126,9 +121,10 @@ void mainProgram(Position *robotPos)
 			detected = driveUltrasonic(-SQUARE_LENGTH, &*robotPos);
 			count++;
 		}
-		sleep(1000);
-		triangulate(&*robotPos);
-		//correctiveDrive(TRI_OFFSET + CLAW_OFFSET, &*robotPos);
+		wait1Msec(1000);
+		float distToBlock = triangulate(&*robotPos);
+		wait1Msec(1000);
+		correctiveDrive(distToBlock, &*robotPos);
 		int objectColor = pickUpObject();
 		if (objectColor == -1)
 			failed = true;
@@ -250,7 +246,7 @@ int rotateAbsolute(int angle)
 
 
 // -
-void triangulate(Position *robotPos)
+float triangulate(Position *robotPos)
 {
 	float triLengthA = SensorValue[LEFT_ULTRA_PORT];
   float triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
@@ -259,13 +255,17 @@ void triangulate(Position *robotPos)
   if(triLengthA == 0 || triLengthC == 0)
   	displayString(1, "ERROR");
 
- 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 5)
+ 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 30)
  	{
   	avgTriLength = 0;
 		triLengthA = SensorValue[LEFT_ULTRA_PORT];
 		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
 		if(triLengthA == 0 || triLengthC == 0)
 			displayString(1, "ERROR");
+
+
+		displayString(1, "%f", triLengthA);
+		displayString(2, "%f", triLengthC);
 		if ((triLengthA < TRI_OFFSET-5 || triLengthC < TRI_OFFSET-5) && triLengthA != 0 && triLengthC != 0 && TRI_LENGTH_B + triLengthC > triLengthA)
 		{
 			float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
@@ -280,17 +280,20 @@ void triangulate(Position *robotPos)
 				rotateRobot(deltaGamma/3);
 			}
 			displayString(4, "Gamma: %d",deltaGamma);
-		displayString(6, "inner loop");
-		displayString(7, "Left: %d", triLengthA);
-		displayString(8, "Right: %d", triLengthC);
+			displayString(6, "inner loop");
+			displayString(7, "Left: %d", triLengthA);
+			displayString(8, "Right: %d", triLengthC);
 		}
 		count++;
-
 	}
+
+
+
+
 	float rotatedOffset = abs(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2)));
 	if (rotatedOffset+GRIP_LENGTH > TRI_OFFSET)
 		rotatedOffset = 0;
-	correctiveDrive(rotatedOffset+GRIP_LENGTH, robotPos);
+	return(rotatedOffset+GRIP_LENGTH);
 }
 
 
