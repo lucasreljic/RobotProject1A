@@ -87,9 +87,12 @@ task main()
 	setGripperPosition(GRIPPER_PORT, 5, 70);
 	liftPID(MAX_LIFT);
 
-	while (!getButtonPress(buttonEnter))
+	if (!getButtonPress(buttonEnter))
 	{
-		triangulate();
+		triangulate(&robotPos);
+		//wait1Msec(1000);
+		//pickUpObject();
+		//wait1Msec(5000);
 
 		//while(!getButtonPress(buttonAny))
 		//{writeDebugStreamLine("%f", getMuxSensorValue(SIDE_ULTRA_PORT)/10);}
@@ -284,7 +287,10 @@ void triangulate(Position *robotPos)
 		count++;
 
 	}
-	correctiveDrive(abs(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2))), robotPos);
+	float rotatedOffset = abs(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2)));
+	if (rotatedOffset+GRIP_LENGTH > TRI_OFFSET)
+		rotatedOffset = 0;
+	correctiveDrive(rotatedOffset+GRIP_LENGTH, robotPos);
 }
 
 
