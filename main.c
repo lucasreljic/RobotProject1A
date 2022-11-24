@@ -255,7 +255,7 @@ int rotateRobot(int angle)
 	int startAngle = getGyroDegrees(GYRO_PORT);
 	const float KP = 0.26;//0.26
 	const float KI = 0.001;//0.0008
-	const float KD = 0.01;//0.23
+	const float KD = 0.1;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
 	float mPower = 0;
 	float prevError = 0;
@@ -268,7 +268,7 @@ int rotateRobot(int angle)
 				 )
 	{
 		error = abs(angle - (getGyroDegrees(GYRO_PORT)-startAngle));
-		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*((error-prevError)/(time1[T1] + 1));
 		if (angle>0)
 		{
 			driveBoth(-mPower, mPower);
@@ -289,7 +289,7 @@ int rotateAbsolute(int angle)
 {
 	const float KP = 0.26;//0.26
 	const float KI = 0.001;//0.0008
-	const float KD = 0.01;//0.23
+	const float KD = 0.1;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT));//
 	float mPower = 0;
 	float prevError = 0;
@@ -302,7 +302,7 @@ int rotateAbsolute(int angle)
 				)
 	{
 		error = angle - getGyroDegrees(GYRO_PORT);// error for turn PID
-		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// turn PID calculation
+		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*((error-prevError)/(time1[T1] + 1));// turn PID calculation
 		driveBoth(-mPower, mPower);// turn motors based on motor power from PID with one being negative
 		prevError = error;// previous error for PID
 	}
