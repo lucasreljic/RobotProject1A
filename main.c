@@ -54,6 +54,7 @@ const int MAX_LIFT = 25;
 const int ULTRA_INTERCEPT = 39;
 const int ANGLE_CORRECTION = 3;
 const int FIX_ANGLE = 2;
+const int MAX_PASSES = 2;
 
 // sensors
 const int RIGHT_ULTRA_PORT = 0;
@@ -114,38 +115,75 @@ void mainProgram(Position *robotPos)
 	bool failed = false;
 	liftPID(MAX_LIFT);
 	int count = 0;
-	while (!getButtonPress(buttonEnter) && (count < 2 || failed == false))
+	int inverted = 1;
+	int passes = 0;
+
+	while (!getButtonPress(buttonEnter) && passes < MAX_PASSES)
 	{
-		count = 0;
-	  bool detected = false;
-		while(!getButtonPress(buttonEnter) && (count < 2 || detected == true))
+		bool detected = driveUltrasonic(SQUARE_LENGTH*inverted, &*robotPos);
+
+		if (detected)
 		{
+			wait1Msec(5000);
+			displayString(9, "main triangulate");
+			float distToBlock = triangulate(&*robotPos);
+			wait1Msec(5000);
+			displayString(9, "main corrective");
+			correctiveDrive(distToBlock, &*robotPos);
+			wait1Msec(5000);
+			displayString(9, "main pick up");
+			int objectColor = pickUpObject();
+			if (objectColor == -1)
+				failed = true;
+			wait1Msec(5000);
+			//goToBin(objectColor, &*robotPos);
+			Position origin;
+			origin.x = 0;
+			origin.y = 0;
+			driveToPos(origin, &*robotPos);
 
-			displayString(9, "main driveUltra count: %d", count);
-			detected = driveUltrasonic( SQUARE_LENGTH, &*robotPos);
-			detected = driveUltrasonic(-SQUARE_LENGTH, &*robotPos);
-			count++;
+			passes = 0;
+			inverted = 1;
+		}else
+		{
+			inverted *= -1;
+			passes++;
 		}
-		wait1Msec(1000);
-		displayString(9, "main triangulate");
-		float distToBlock = triangulate(&*robotPos);
-		wait1Msec(1000);
-		displayString(9, "main corrective");
-		correctiveDrive(distToBlock, &*robotPos);
-		displayString(9, "main pick up");
-		int objectColor = pickUpObject();
-		if (objectColor == -1)
-			failed = true;
-
-		//goToBin(objectColor, &*robotPos);
-	 	Position origin;
-		origin.x = 0;
-		origin.y = 0;
-		driveToPos(origin, &*robotPos);
 	}
 
 	emergShutdown();// in case button enter is pressed or program ends
 }
+
+
+//displayString(8, "second loop");
+//displayString(9, "main driveUltra count: %d", count);
+//detected = driveUltrasonic( SQUARE_LENGTH, &*robotPos);
+//detected = driveUltrasonic(-SQUARE_LENGTH, &*robotPos);
+//count++;
+
+
+
+
+//wait1Msec(1000);
+//displayString(9, "main triangulate");
+//float distToBlock = triangulate(&*robotPos);
+//wait1Msec(1000);
+//displayString(9, "main corrective");
+//correctiveDrive(distToBlock, &*robotPos);
+//displayString(9, "main pick up");
+//int objectColor = pickUpObject();
+//if (objectColor == -1)
+//	failed = true;
+
+////goToBin(objectColor, &*robotPos);
+//Position origin;
+//origin.x = 0;
+//origin.y = 0;
+//driveToPos(origin, &*robotPos);
+
+
+
+
 
 
 // Reading from the Multiplexer (int i) is the port number of the sensor
@@ -314,7 +352,12 @@ float triangulate(Position *robotPos)
 			rotateRobot(FIX_ANGLE);
 		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
 			displayString(1, "both too long");
-			emergShutdown();
+			Position origin;
+			origin.x = 0;
+			origin.y = 0;
+			driveToPos(origin, &*robotPos);
+			return(0);
+			//emergShutdown();
 
 
 		if (getButtonPress(buttonEnter))
@@ -349,17 +392,15 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	while (!getButtonPress(buttonEnter) && abs((nMotorEncoder[motorA] - initEncoder)/TICK_TO_CM) < abs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
 		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
-		displayString(5, "%d", sensorDistance);
 	}
+	if(getButtonPress(buttonEnter))
+		emergShutdown();
 
 	drive(0);
-	wait1Msec(100);
-	sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
-	displayString(5, "%d", sensorDistance);
+	wait1Msec(1000);
 	// when an object is spotted
 	if(sensorDistance < RANGE)
 	{
-
 		float distTraveled = 0;
 		if (-1*inverted < 0) // going forward (decreasing encoder)
 			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
@@ -377,8 +418,9 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		correctiveDrive(offset, &*robotPos);
 		rotateRobot(90);
 		float objDist = sqrt (pow (offset, 2) + pow(sensorDistance, 2));
+
 		float objDistTravel = objDist-TRI_OFFSET;
-		if(0 > objDistTravel)
+		if(objDistTravel < 0)
 		{
 			objDistTravel = 0;
 		}
@@ -386,7 +428,7 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		correctiveDrive(abs(objDistTravel), &*robotPos);
 		return(true);
 	}
-	//writeDebugStreamLine("not funny")
+
 	drive(0);
 	return (false);
 }
@@ -524,6 +566,7 @@ void emergShutdown() // called when stuff goes really wrong
 	driveBoth(0,0);
 	setGripperPosition(GRIPPER_PORT, 5, 65);
 	liftPID(0);
+	wait1Msec(5000);
 	stopAllTasks();
 }
 
