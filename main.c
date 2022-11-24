@@ -423,7 +423,7 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		if (-1*inverted < 0) // going forward (decreasing encoder)
 			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
 		else // going backward (increasing encoder)
-			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
+			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM);
 		(*robotPos).x += distTraveled;
 
 		writeDebugStreamLine("x pos: %f", (*robotPos).x);
@@ -433,7 +433,7 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		writeDebugStreamLine("sensor dist: %f", sensorDistance);
 		float offset = SENSOR_OFFSET + sin(ULTRA_DEG*DEG_TO_RAD)*sensorDistance;
 		writeDebugStreamLine("Distance to travel back: %f", offset);
-		correctiveDrive(offset, &*robotPos);
+		correctiveDrive(offset*inverted, &*robotPos);
 		rotateRobot(90);
 		//float objDist = sqrt (pow(sensorDistance, 2) - pow(offset, 2));
 		if (sensorDistance >TRI_OFFSET)
