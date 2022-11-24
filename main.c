@@ -133,10 +133,12 @@ void mainProgram(Position *robotPos)
 			{
 				//wait1Msec(5000);
 				displayString(9, "main corrective");
+				liftPID(0);
 				correctiveDrive(distToBlock, &*robotPos);
 				//wait1Msec(5000);
 				displayString(9, "main pick up");
 				int objectColor = pickUpObject();
+				displayString(6, "Color: %d", objectColor);
 				if (objectColor == -1)
 					failed = true;
 				//wait1Msec(5000);
@@ -251,8 +253,8 @@ void driveBoth(int pwrL, int pwrR)
 int rotateRobot(int angle)
 {
 	int startAngle = getGyroDegrees(GYRO_PORT);
-	const float KP = 0.3;//0.26
-	const float KI = 0.003;//0.0008
+	const float KP = 0.26;//0.26
+	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
 	float mPower = 0;
@@ -285,7 +287,7 @@ int rotateRobot(int angle)
 // Rotates the robot to an angle relative to the initial gyro zeroing when program starts, positive angles are clockwise when viewed from above
 int rotateAbsolute(int angle)
 {
-	const float KP = 0.3;//0.26
+	const float KP = 0.26;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT));//
@@ -590,28 +592,36 @@ void goToBin(int color, Position *robotPos)
 
 	if(color == (int)colorRed)
 	{
-		targetPos.x = 10;
+		targetPos.x = -20;
 		targetPos.y = 0;
-		driveToPos(targetPos, &*robotPos, 270);
+		driveToPos(targetPos, &*robotPos, -90);
+		wait1Msec(100);
+		setGripperPosition(GRIPPER_PORT, 5, 65);
 		//drive forward slightly to container
-	}
+		correctiveDrive(-20, &*robotPos);
+		}
 	if(color == (int)colorBlue)
 	{
 		targetPos.x = 0;
-		targetPos.y = 10;
+		targetPos.y = -20;
     driveToPos(targetPos, &*robotPos, 180);
+    setGripperPosition(GRIPPER_PORT, 5, 65);
     //drive forward slightly to container
-	}
+		correctiveDrive(-20, &*robotPos);
+    }
 	if(color == (int)colorGreen)
 	{
-		targetPos.x = 0;
-		targetPos.y = 0;
+		targetPos.x = -10;
+		targetPos.y = -10;
     driveToPos(targetPos, &*robotPos, 225);
-    //drive forward slightly to container
-	}
-	setGripperPosition(GRIPPER_PORT, 5, 65);
+    setGripperPosition(GRIPPER_PORT, 5, 65);
+		//drive forward slightly to container
+		correctiveDrive(-20, &*robotPos);
+    }
 	targetPos.x = 0;
 	targetPos.y = 0;
 
 	driveToPos(targetPos, &*robotPos, 0); // return to origin
+	setGripperPosition(GRIPPER_PORT, 5, 65);
+
 }
