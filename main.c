@@ -43,7 +43,7 @@ const float TICK_TO_CM = 180/(PI*1.6);
 //const float CM_TO_TICK = (PI*1.6)/180;
 const float DEG_TO_RAD = PI/180.0;
 const float RAD_TO_DEG = 180/PI;
-const float ULTRA_DEG = 12;
+const float ULTRA_DEG = 8;
 const float SENSOR_OFFSET = 5;
 const float CLAW_OFFSET = 5;
 const int GRIP_LENGTH = 10;
@@ -51,6 +51,9 @@ const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
 const int SQUARE_LENGTH = 100;
 const int MAX_LIFT = 25;
+const int ULTRA_INTERCEPT = 39;
+const int ANGLE_CORRECTION = 3;
+const int FIX_ANGLE = 2;
 
 // sensors
 const int RIGHT_ULTRA_PORT = 0;
@@ -94,11 +97,11 @@ task main()
 
 		if (getButtonPress(buttonUp))
 		{
-			float dist = triangulate(&robotPos);
-			wait1Msec(1000);
-			correctiveDrive(dist, &robotPos);
-			pickUpObject();
-			//mainProgram(robotPos);
+			//float dist = triangulate(&robotPos);
+			//wait1Msec(1000);
+			//correctiveDrive(dist, &robotPos);
+			//pickUpObject();
+			mainProgram(robotPos);
 		}
 	}
 	emergShutdown();
@@ -117,14 +120,19 @@ void mainProgram(Position *robotPos)
 	  bool detected = false;
 		while(!getButtonPress(buttonEnter) && (count < 2 || detected == true))
 		{
+
+			displayString(9, "main driveUltra count: %d", count);
 			detected = driveUltrasonic( SQUARE_LENGTH, &*robotPos);
 			detected = driveUltrasonic(-SQUARE_LENGTH, &*robotPos);
 			count++;
 		}
 		wait1Msec(1000);
+		displayString(9, "main triangulate");
 		float distToBlock = triangulate(&*robotPos);
 		wait1Msec(1000);
+		displayString(9, "main corrective");
 		correctiveDrive(distToBlock, &*robotPos);
+		displayString(9, "main pick up");
 		int objectColor = pickUpObject();
 		if (objectColor == -1)
 			failed = true;
@@ -171,6 +179,9 @@ void configureSensors()
 // Drive both motors at the same power
 void drive(int pwr)
 {
+
+	displayString(11, "drive");
+
 	motor[MOTOR_LEFT] = motor[MOTOR_RIGHT] = pwr;
 }
 
@@ -178,6 +189,8 @@ void drive(int pwr)
 // Drive each side individually
 void driveBoth(int pwrL, int pwrR)
 {
+	displayString(11, "driveBoth");
+
 	motor[MOTOR_LEFT] = pwrL;
 	motor[MOTOR_RIGHT] = pwrR;
 }
@@ -187,7 +200,7 @@ void driveBoth(int pwrL, int pwrR)
 int rotateRobot(int angle)
 {
 	int startAngle = getGyroDegrees(GYRO_PORT);
-	const float KP = 0.26;//0.5
+	const float KP = 0.5;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.01;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
@@ -248,6 +261,10 @@ int rotateAbsolute(int angle)
 // -
 float triangulate(Position *robotPos)
 {
+
+	displayString(11, "triangulate");
+
+
 	float triLengthA = SensorValue[LEFT_ULTRA_PORT];
   float triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
   int count = 0;
@@ -255,8 +272,9 @@ float triangulate(Position *robotPos)
   if(triLengthA == 0 || triLengthC == 0)
   	displayString(1, "ERROR");
 
- 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 30)
+ 	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 20)
  	{
+
   	avgTriLength = 0;
 		triLengthA = SensorValue[LEFT_ULTRA_PORT];
 		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
@@ -266,33 +284,48 @@ float triangulate(Position *robotPos)
 
 		displayString(1, "%f", triLengthA);
 		displayString(2, "%f", triLengthC);
-		if ((triLengthA < TRI_OFFSET-5 || triLengthC < TRI_OFFSET-5) && triLengthA != 0 && triLengthC != 0 && TRI_LENGTH_B + triLengthC > triLengthA)
+		// 255
+		//  19
+		if (triLengthA < ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT)
 		{
-			float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
-			writeDebugStreamLine("Gamma init: %d",gammaInit);
-			avgTriLength = (triLengthA + triLengthC)/2;
-			float gammaFinal = (acos(TRI_LENGTH_B/(2*avgTriLength)))/DEG_TO_RAD;
-			writeDebugStreamLine("Gamma final: %d",gammaInit);
-			float deltaGamma = (gammaInit - gammaFinal);
-
-			if(abs(deltaGamma) < 90)
+			//   (255 < 25   or    19 < 25)    and   (255 != 0)   and    (19 != 0)   and    (20 + 19 > 255)
+			if ((triLengthA < TRI_OFFSET-5 || triLengthC < TRI_OFFSET-5) && triLengthA != 0 && triLengthC != 0 && TRI_LENGTH_B + triLengthC > triLengthA)
 			{
-				rotateRobot(deltaGamma/3);
+				float gammaInit = (acos((pow(triLengthA, 2) + pow(TRI_LENGTH_B, 2) - pow(triLengthC, 2))/(2*triLengthA*TRI_LENGTH_B)))/DEG_TO_RAD;
+				writeDebugStreamLine("Gamma init: %d",gammaInit);
+				avgTriLength = (triLengthA + triLengthC)/2;
+				float gammaFinal = (acos(TRI_LENGTH_B/(2*avgTriLength)))/DEG_TO_RAD;
+				writeDebugStreamLine("Gamma final: %d",gammaInit);
+				float deltaGamma = (gammaInit - gammaFinal);
+
+				if(abs(deltaGamma) < 90)
+				{
+					rotateRobot(deltaGamma/ANGLE_CORRECTION);
+				}
+				displayString(4, "Gamma: %d",deltaGamma);
+				displayString(6, "inner loop");
+				displayString(7, "Left: %d", triLengthA);
+				displayString(8, "Right: %d", triLengthC);
 			}
-			displayString(4, "Gamma: %d",deltaGamma);
-			displayString(6, "inner loop");
-			displayString(7, "Left: %d", triLengthA);
-			displayString(8, "Right: %d", triLengthC);
 		}
+		else if (triLengthA > ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT)
+			rotateRobot(-FIX_ANGLE);
+		else if (triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
+			rotateRobot(FIX_ANGLE);
+		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
+			displayString(1, "both too long");
+			emergShutdown();
+
+
+		if (getButtonPress(buttonEnter))
+			emergShutdown();
+
 		count++;
 	}
 
-
-
-
-	float rotatedOffset = abs(sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2)));
+	float rotatedOffset = sqrt(pow(TRI_LENGTH_B/2, 2) + pow(avgTriLength, 2));
 	if (rotatedOffset+GRIP_LENGTH > TRI_OFFSET)
-		rotatedOffset = 0;
+		return(0);
 	return(rotatedOffset+GRIP_LENGTH);
 }
 
@@ -300,6 +333,9 @@ float triangulate(Position *robotPos)
 // -
 bool driveUltrasonic(int distance, Position *robotPos)
 {
+
+	displayString(11, "ultrasonic");
+
 	float initDistance	= nMotorEncoder[motorA];
 	int inverted = 1;
 	if (distance < 0)
@@ -342,12 +378,12 @@ bool driveUltrasonic(int distance, Position *robotPos)
 		rotateRobot(90);
 		float objDist = sqrt (pow (offset, 2) + pow(sensorDistance, 2));
 		float objDistTravel = objDist-TRI_OFFSET;
-		if(TRI_OFFSET > objDist)
+		if(0 > objDistTravel)
 		{
 			objDistTravel = 0;
 		}
 		displayString(3, "Forward Distance: %d", objDistTravel);
-		correctiveDrive(objDistTravel+GRIP_LENGTH, &*robotPos);
+		correctiveDrive(abs(objDistTravel), &*robotPos);
 		return(true);
 	}
 	//writeDebugStreamLine("not funny")
@@ -359,6 +395,9 @@ bool driveUltrasonic(int distance, Position *robotPos)
 // -
 void correctiveDrive(int distance, Position *robotPos)
 {
+
+	displayString(11, "corrective");
+	displayString(12, "corDist: %d", distance);
 
 	//Only works when distance is negative
 	distance *= -1;
@@ -461,7 +500,7 @@ void driveToPos(Position targetPos, Position *robotPos, int finalRotation)
 	angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
 
 	rotateRobot(angle);
-	correctiveDrive( -sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
+	correctiveDrive( sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
 
 	rotateAbsolute(finalRotation);
 }
@@ -481,9 +520,11 @@ int pickUpObject()
 // -
 void emergShutdown() // called when stuff goes really wrong
 {
+	displayString(1, "shutting down");
 	driveBoth(0,0);
 	setGripperPosition(GRIPPER_PORT, 5, 65);
 	liftPID(0);
+	stopAllTasks();
 }
 
 
