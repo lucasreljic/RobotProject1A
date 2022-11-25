@@ -25,8 +25,8 @@ void driveBoth(int pwrL, int pwrR);
 int rotateRobot(int angle);
 int rotateAbsolute(int angle);
 float triangulate(Position *robotPos);
-bool driveUltrasonic(int distance, Position *robotPos);
-void correctiveDrive(int distance, Position *robotPos);
+bool driveUltrasonic(float distance, Position *robotPos);
+void correctiveDrive(float distance, Position *robotPos);
 void liftPID(int distance);
 void driveToPos(Position targetPos, Position *robotPos, int finalRotation=0);
 int pickUpObject();
@@ -52,12 +52,12 @@ const float SENSOR_OFFSET = 5;
 const int GRIP_LENGTH = 10;
 const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
-const int SQUARE_LENGTH = 100;
+const float SQUARE_LENGTH = 100.0;
 const int MAX_LIFT = 25;
 const int ULTRA_INTERCEPT = 39; //  distance from sensors where they intercept
 const int ANGLE_CORRECTION = 3;
 const int FIX_ANGLE = 2;
-const int MAX_PASSES = 2;
+const int MAX_PASSES = 4;
 const int MAX_POWER = 70;
 const int GRIPPER_OPEN = 70;
 const int GRIPPER_CLOSED = 0;
@@ -90,22 +90,18 @@ task main()
   if (!initSensor(&muxedSensor[2], msensor_S1_3, typeMode[2]))
   	writeDebugStreamLine("initSensor() failed! for msensor_S1_3");
 
-	// tracks position of robot
+	// tracks position of robot=
 	Position robotPos;
 	robotPos.x = 0;
 	robotPos.y = 0;
 
 	setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
-	liftPID(MAX_LIFT);
-
+	//liftPID(MAX_LIFT);
+	//while (true){
+//		displayString(5, "color: %d", getMuxSensorValue(COLOR_PORT));}
 	if (!getButtonPress(buttonEnter))
 	{
-		while(!getButtonPress(buttonAny))
-
-		if (getButtonPress(buttonUp))
-		{
-			mainProgram(robotPos);
-		}
+		mainProgram(&robotPos);
 	}
 	emergShutdown();
 }
@@ -140,10 +136,6 @@ void mainProgram(Position *robotPos)
 			}
 			passes = 0;
 			inverted = 1;
-			Position origin;
-			origin.x = 0;
-			origin.y = 0;
-			driveToPos(origin, &*robotPos);
 		}
 		else
 		{
@@ -152,7 +144,6 @@ void mainProgram(Position *robotPos)
 		}
 	}
 
-	wait1Msec(10000);
 	emergShutdown();// in case button enter is pressed or program ends
 }
 
@@ -326,7 +317,7 @@ float triangulate(Position *robotPos)
 
 
 // -
-bool driveUltrasonic(int distance, Position *robotPos)
+bool driveUltrasonic(float distance, Position *robotPos)
 {
 
 	int inverted = 1;
@@ -336,9 +327,12 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	const float RANGE = 105;
 	int initEncoder = nMotorEncoder[motorA];
 	drive(-30*inverted);
-	while (!getButtonPress(buttonEnter) && abs((nMotorEncoder[motorA] - initEncoder)/TICK_TO_CM) < abs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
+	float turnError = 0;
+	while (!getButtonPress(buttonEnter) && fabs((nMotorEncoder[motorA] - initEncoder)/TICK_TO_CM) < fabs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
+		turnError = getGyroDegrees(GYRO_PORT);
 		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
+		driveBoth(-30*inverted + turnError, -30*inverted - turnError);
 	}
 	if(getButtonPress(buttonEnter))
 		emergShutdown();
@@ -346,26 +340,43 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
 	drive(0);
 	wait1Msec(1000);
+
+	float distTraveled = 0;
+
+
+	// going forward: -20 -> -80   -20-(-80)= 60
+	// going backward -80 -> -20   -80-(-20)= -60
+
+	//if (-1*inverted < 0) // going forward (decreasing encoder)
+
+	//	distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
+	//else // going backward (increasing encoder)
+	//{
+	distTraveled = ((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM);
+
+	(*robotPos).x += distTraveled;
+
+	displayString(1, "ULTRASONIC");
+	displayString(2, "new x: %f", (*robotPos).x);
+	displayString(3, "new y: %f", (*robotPos).y);
+	displayString(4, "x change: %f", distTraveled);
+	displayString(5, "y change: ---");
+
+	writeDebugStreamLine("ULTRASONIC");
+	writeDebugStreamLine("new x: %f", (*robotPos).x);
+	writeDebugStreamLine("new y: %f", (*robotPos).y);
+	writeDebugStreamLine("x change: %f", distTraveled);
+	writeDebugStreamLine("y change: ---");
+
 	// when an object is spotted
 	if(sensorDistance < RANGE)
 	{
-		float distTraveled = 0;
-
-		if (-1*inverted < 0) // going forward (decreasing encoder)
-			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
-		else // going backward (increasing encoder)
-		{
-			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM);
-		}
-
-		(*robotPos).x += distTraveled;
-
 
 		float offset = SENSOR_OFFSET + sin(ULTRA_FOV*DEG_TO_RAD)*sensorDistance;
 		correctiveDrive(offset*inverted, &*robotPos);
 		rotateRobot(90);
 		//float objDist = sqrt (pow(sensorDistance, 2) - pow(offset, 2));
-		if (sensorDistance >TRI_OFFSET)
+		if (sensorDistance > TRI_OFFSET)
 			correctiveDrive(sensorDistance-TRI_OFFSET, &*robotPos);
 		return(true);
 	}
@@ -375,12 +386,12 @@ bool driveUltrasonic(int distance, Position *robotPos)
 }
 
 
-// -
-void correctiveDrive(int distance, Position *robotPos)
+// distance (positive is forward, negative is reverse)
+void correctiveDrive(float distance, Position *robotPos)
 {
 
 	//Only works when distance is negative
-	distance *= -1;
+	//distance *= -1;
 	//Driving PID Constants
 	const float KP = 1;
 	const float KI = 0.001;
@@ -398,42 +409,49 @@ void correctiveDrive(int distance, Position *robotPos)
 	nMotorEncoder[MOTOR_LEFT] = 0;
 	float mPower = 0;
 	float prevError = 0;
-	int inverted = 1;
 	time1[T1] = 0;// start timer for PID loop
-	if (distance < 0)// allows for negative direction
-	{
-		inverted = -1;
-	}
-	float error = distance*inverted;
+	float error = distance;
 	float distanceTravelled = 0;
 	while (!getButtonPress(buttonEnter) && abs(error) > TOLERANCE)
 	{
 		if(nMotorEncoder[MOTOR_RIGHT] > nMotorEncoder[MOTOR_LEFT])// takes the lowest encoder value
 		{
-			distanceTravelled = nMotorEncoder[MOTOR_LEFT]/TICK_TO_CM;
+			distanceTravelled = -nMotorEncoder[MOTOR_LEFT]/TICK_TO_CM;
 		}
 		else
 		{
-			distanceTravelled = nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
+			distanceTravelled = -nMotorEncoder[MOTOR_RIGHT]/TICK_TO_CM;
 		}
 		turnError = ANGLE - getGyroDegrees(GYRO_PORT);// Turn PID error
 		mTurnPower = TURN_KP*turnError + TURN_KI*((turnError+turnPrevError)*(time1[T1] + 1)/2) + TURN_KD*(turnError-turnPrevError);// turn pid calculation
-		error = (distance - distanceTravelled)*inverted;// Drive PID error
+		error = (distance - distanceTravelled);// Drive PID error
 
 		mPower = KP*error + KI*((error+prevError)*(time1[T1] + 1)/2) + KD*abs(((error-prevError)/(time1[T1] + 1)));// drive PID calculation
 		if(mPower > MAX_POWER)
 		{
 			mPower = MAX_POWER;
 		}
-		driveBoth((mPower*inverted -mTurnPower), (mPower*inverted +mTurnPower));//add turn power to drive power to adjust for
+		driveBoth((-mPower -mTurnPower), (-mPower +mTurnPower));//add turn power to drive power to adjust for
 		prevError = error;// for PID
 		turnPrevError = turnError;// for Turn PID
 	}
 	rotateAbsolute(ANGLE);
 	drive(0);// stop motors
 
-	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*-distance;
-	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*-distance;
+	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*distance;
+	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*distance;
+
+	displayString(1, "CORRECTIVE");
+	displayString(2, "new x: %f", (*robotPos).x);
+	displayString(3, "new y: %f", (*robotPos).y);
+	displayString(4, "x change: %f", cos((ANGLE)*DEG_TO_RAD)*distance);
+	displayString(5, "y change: %f", sin((ANGLE)*DEG_TO_RAD)*distance);
+
+	writeDebugStreamLine("CORRECTIVE");
+	writeDebugStreamLine("new x: %f", (*robotPos).x);
+	writeDebugStreamLine("new y: %f", (*robotPos).y);
+	writeDebugStreamLine("x change: %f", cos((ANGLE)*DEG_TO_RAD)*distance);
+	writeDebugStreamLine("y change: %f", sin((ANGLE)*DEG_TO_RAD)*distance);
 }
 
 
@@ -509,35 +527,37 @@ void emergShutdown() // called when stuff goes really wrong
 
 
 // -
+
+const int BIN_DISTANCE = 30;
 void goToBin(int color, Position *robotPos)
 {
 	Position targetPos;
 
 	if(color == (int)colorRed)
 	{
-		targetPos.x = -20;
+		targetPos.x = -BIN_DISTANCE;
 		targetPos.y = 0;
 		driveToPos(targetPos, &*robotPos, -90);
 		}
 	if(color == (int)colorBlue)
 	{
 		targetPos.x = 0;
-		targetPos.y = -20;
+		targetPos.y = -BIN_DISTANCE;
     driveToPos(targetPos, &*robotPos, 180);
     }
 	if(color == (int)colorGreen)
 	{
-		targetPos.x = -10;
-		targetPos.y = -10;
+		targetPos.x = -BIN_DISTANCE;
+		targetPos.y = -BIN_DISTANCE;
     driveToPos(targetPos, &*robotPos, 225);
   }
-	targetPos.x = 0;
-	targetPos.y = 0;
-
 
 	wait1Msec(100);
 	setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
 	correctiveDrive(-20, &*robotPos);
 
-	driveToPos(targetPos, &*robotPos, 0); // return to origin
+	Position origin;
+	origin.x = 0;
+	origin.y = 0;
+	driveToPos(origin, &*robotPos);
 }
