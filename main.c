@@ -33,7 +33,6 @@ int pickUpObject();
 void emergShutdown();
 void goToBin(int color, Position *robotPos);
 
-
 // motors
 const int MOTOR_LEFT = motorD;
 const int MOTOR_RIGHT = motorA;
@@ -310,13 +309,13 @@ float triangulate(Position *robotPos)
 				float deltaGamma = (gammaInit - gammaFinal);
 				if(abs(deltaGamma) < 90)
 				{
-					rotateRobot(round(deltaGamma/ANGLE_CORRECTION));
+					rotateRobot(deltaGamma/ANGLE_CORRECTION);
 				}
 			}
 		}
 		else if ((triLengthA > ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT))
 			rotateRobot(-FIX_ANGLE);
-		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT && abs(initialAngle - getGyroDegrees(GYRO_PORT)) < 15 ))
+		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT && abs(initialAngle - getGyroDegrees(GYRO_PORT)) < 10 ))
 				rotateRobot(FIX_ANGLE);
 		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
 			displayString(7, "both too long");
@@ -505,7 +504,7 @@ void driveToPos(Position targetPos, Position *robotPos, int finalRotation, bool 
 	posRelative.y = (*robotPos).y - targetPos.y;
 
 	const float TOL = 1.0/10;
-	if ( fabs(posRelative.x - targetPos.x) <= TOL && fabs(posRelative.x - targetPos.x) <= TOL)
+	if ( abs(posRelative.x - targetPos.x) <= TOL && abs(posRelative.x - targetPos.x) <= TOL)
 	{
 		if (rotate)
 			rotateAbsolute(finalRotation);
@@ -514,7 +513,7 @@ void driveToPos(Position targetPos, Position *robotPos, int finalRotation, bool 
 	{
 		float angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
 
-		rotateAbsolute(round(180 + angle));
+		rotateAbsolute(180 + angle);
 		correctiveDrive( sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
 
 		if (rotate)
