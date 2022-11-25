@@ -99,9 +99,6 @@ task main()
 	robotPos.y = 0;
 
 	setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
-	//liftPID(MAX_LIFT);
-	//while (true){
-//		displayString(5, "color: %d", getMuxSensorValue(COLOR_PORT));}
 	if (!getButtonPress(buttonEnter))
 	{
 		mainProgram(&robotPos);
@@ -138,15 +135,9 @@ void mainProgram(Position *robotPos)
 				origin.y = 0;
 				driveToPos(origin, &*robotPos, 180, false);
 
-				if (objectColor == (int)colorRed || objectColor == (int)colorGreen || objectColor == (int)colorBlack)
-				{
-					goToBin(objectColor, &*robotPos);
-				}
-				else
-				{
-					rotateAbsolute(0);
-					setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
-				}
+				displayString(11, "Color: %f", objectColor);
+
+				goToBin(objectColor, &*robotPos);
 				wait1Msec(100);
 			}
 			passes = 0;
@@ -158,7 +149,6 @@ void mainProgram(Position *robotPos)
 			passes++;
 		}
 	}
-
 	emergShutdown();// in case button enter is pressed or program ends
 }
 
@@ -326,7 +316,7 @@ float triangulate(Position *robotPos)
 		}
 		else if ((triLengthA > ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT))
 			rotateRobot(-FIX_ANGLE);
-		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT && abs(initialAngle - getGyroDegrees(GYRO_PORT)) < 20 ))
+		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT && abs(initialAngle - getGyroDegrees(GYRO_PORT)) < 15 ))
 				rotateRobot(FIX_ANGLE);
 		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
 			displayString(7, "both too long");
@@ -567,24 +557,38 @@ void goToBin(int color, Position *robotPos)
 		targetPos.x = -BIN_DISTANCE;
 		targetPos.y = 0;
 		driveToPos(targetPos, &*robotPos, 180);
+	  wait1Msec(100);
+		setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
+		correctiveDrive(-20, &*robotPos);
 		}
-	if(color == (int)colorBlack)
+	else if(color == (int)colorBlack)
 	{
 		targetPos.x = 0;
 		targetPos.y = -BIN_DISTANCE;
     driveToPos(targetPos, &*robotPos, 270);
+	  wait1Msec(100);
+		setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
+		correctiveDrive(-20, &*robotPos);
+
     }
-	if(color == (int)colorGreen)
+	else if(color == (int)colorGreen)
 	{
 		targetPos.x = -BIN_DISTANCE;
 		targetPos.y = -BIN_DISTANCE;
     driveToPos(targetPos, &*robotPos, 225);
+	  wait1Msec(100);
+		setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
+		correctiveDrive(-20, &*robotPos);
   }
-
-	wait1Msec(100);
-	setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
-	correctiveDrive(-20, &*robotPos);
-
+  else
+  {
+  	targetPos.x = -BIN_DISTANCE;
+		targetPos.y = BIN_DISTANCE;
+    driveToPos(targetPos, &*robotPos, 135);
+	  wait1Msec(100);
+		setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
+		correctiveDrive(-20, &*robotPos);
+  }
 	Position origin;
 	origin.x = 0;
 	origin.y = 0;
