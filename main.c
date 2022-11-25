@@ -52,7 +52,7 @@ const float SENSOR_OFFSET = 2;
 const int GRIP_LENGTH = 10;
 const int TRI_OFFSET = 30;
 const int TRI_LENGTH_B = 20;
-const int OKAY_DIFF = 8;
+const int OKAY_DIFF = 3;
 const float SQUARE_LENGTH = 100.0;
 const int MAX_LIFT = 25;
 const int ULTRA_INTERCEPT = 39; //  distance from sensors where they intercept
@@ -112,6 +112,7 @@ task main()
 // Main Logic of program
 void mainProgram(Position *robotPos)
 {
+	setGripperPosition(TETRIX_PORT, GRIPPER_PORT, GRIPPER_OPEN);
 	liftPID(MAX_LIFT);
 	int inverted = 1;
 	int passes = 0;
@@ -135,9 +136,9 @@ void mainProgram(Position *robotPos)
 				Position origin;
 				origin.x = 0;
 				origin.y = 0;
-				driveToPos(origin, &*robotPos, 0, false);
+				driveToPos(origin, &*robotPos, 180, false);
 
-				if (objectColor == (int)colorRed || objectColor == (int)colorGreen || objectColor == (int)colorBlue)
+				if (objectColor == (int)colorRed || objectColor == (int)colorGreen || objectColor == (int)colorBlack)
 				{
 					goToBin(objectColor, &*robotPos);
 				}
@@ -285,22 +286,17 @@ float triangulate(Position *robotPos)
   float rotatedOffset = 0;
   float avgTriLength = 0;
   float maxGammaTriLength = 0;
-
+	int initialAngle = getGyroDegrees(GYRO_PORT);
   const int REPS = 30;
-
-  bool triAFirst = false;
-  bool triCFirst = false;
-  if (triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
-		triAFirst = true;
-	if (triLengthC < ULTRA_INTERCEPT && triLengthA > ULTRA_INTERCEPT)
-		triCFirst = true;
-
 
  	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= REPS)//!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 20
  	{
   	avgTriLength = 0;
 		triLengthA = SensorValue[LEFT_ULTRA_PORT];
 		triLengthC = (getMuxSensorValue(RIGHT_ULTRA_PORT))/10;
+
+		displayString(12, "A: %f", triLengthA);
+		displayString(13, "C: %f", triLengthC);
 
 		if(triLengthA == 0 || triLengthC == 0)
 		{
@@ -329,22 +325,8 @@ float triangulate(Position *robotPos)
 			}
 		}
 		else if ((triLengthA > ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT))
-		{
-			if (triAFirst)
-			{
-				rotateRobot(FIX_ANGLE);
-				count = REPS;
-			}
-			else
-				rotateRobot(-FIX_ANGLE);
-		}
-		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT))
-			if (triCFirst)
-			{
-				rotateRobot(-FIX_ANGLE);
-				count = REPS;
-			}
-			else
+			rotateRobot(-FIX_ANGLE);
+		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT && abs(initialAngle - getGyroDegrees(GYRO_PORT)) < 20 ))
 				rotateRobot(FIX_ANGLE);
 		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
 			displayString(7, "both too long");
@@ -373,7 +355,7 @@ bool driveUltrasonic(float distance, Position *robotPos)
 	int initEncoder = nMotorEncoder[motorA];
 	drive(-30*inverted);
 	float turnError = 0;
-	while (!getButtonPress(buttonEnter) && fabs((nMotorEncoder[motorA] - initEncoder)/TICK_TO_CM) < fabs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
+	while (!getButtonPress(buttonEnter) && abs((nMotorEncoder[motorA] - initEncoder)/TICK_TO_CM) < abs(distance) && !(getMuxSensorValue(SIDE_ULTRA_PORT)/10 < RANGE))
 	{
 		turnError = getGyroDegrees(GYRO_PORT);
 		sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
@@ -586,7 +568,7 @@ void goToBin(int color, Position *robotPos)
 		targetPos.y = 0;
 		driveToPos(targetPos, &*robotPos, 180);
 		}
-	if(color == (int)colorBlue)
+	if(color == (int)colorBlack)
 	{
 		targetPos.x = 0;
 		targetPos.y = -BIN_DISTANCE;
@@ -606,5 +588,5 @@ void goToBin(int color, Position *robotPos)
 	Position origin;
 	origin.x = 0;
 	origin.y = 0;
-	driveToPos(origin, &*robotPos);
+	driveToPos(origin, &*robotPos, 0);
 }
