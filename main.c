@@ -347,22 +347,23 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	drive(0);
 	wait1Msec(1000);
 	// when an object is spotted
-	if(sensorDistance < RANGE)
-	{
-		float distTraveled = 0;
-
-		if (-1*inverted < 0) // going forward (decreasing encoder)
-			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
-		else // going backward (increasing encoder)
-		{
-			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM);
-		}
-
-		(*robotPos).x += distTraveled;
 
 
 		float offset = SENSOR_OFFSET + sin(ULTRA_FOV*DEG_TO_RAD)*sensorDistance;
 		correctiveDrive(offset*inverted, &*robotPos);
+		if(sensorDistance < RANGE)
+		{
+			float distTraveled = 0;
+
+			if (-1*inverted < 0) // going forward (decreasing encoder)
+				distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM + offset;
+			else // going backward (increasing encoder)
+		{
+			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM + offset);
+		}
+
+		(*robotPos).x += distTraveled;
+
 		rotateRobot(90);
 		//float objDist = sqrt (pow(sensorDistance, 2) - pow(offset, 2));
 		if (sensorDistance >TRI_OFFSET)
@@ -434,6 +435,8 @@ void correctiveDrive(int distance, Position *robotPos)
 
 	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*-distance;
 	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*-distance;
+	displayString(1, "X Pos: %d", (*robotPos).x);
+	displayString(2, "Y Pos: %d", (*robotPos).y);
 }
 
 
