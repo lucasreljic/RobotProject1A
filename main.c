@@ -272,12 +272,8 @@ float triangulate(Position *robotPos)
   float rotatedOffset = 0;
   float avgTriLength = 0;
   float maxGammaTriLength = 0;
+
   const int REPS = 30;
-
-
-  displayString(1, "A: %f", triLengthA);
-  displayString(1, "C: %f", triLengthC);
-
 
  	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= REPS)//!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 20
  	{
@@ -322,8 +318,6 @@ float triangulate(Position *robotPos)
 			displayString(7, "both too long");
 		count++;
 	}
-
-
 	rotatedOffset = sqrt(pow(maxGammaTriLength, 2)-pow(TRI_LENGTH_B/2, 2));
 	//if (rotatedOffset < GRIP_LENGTH)
 		//return(0);
@@ -353,23 +347,22 @@ bool driveUltrasonic(int distance, Position *robotPos)
 	drive(0);
 	wait1Msec(1000);
 	// when an object is spotted
+	if(sensorDistance < RANGE)
+	{
+		float distTraveled = 0;
 
-
-		float offset = SENSOR_OFFSET + sin(ULTRA_FOV*DEG_TO_RAD)*sensorDistance;
-		correctiveDrive(offset*inverted, &*robotPos);
-		if(sensorDistance < RANGE)
+		if (-1*inverted < 0) // going forward (decreasing encoder)
+			distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM;
+		else // going backward (increasing encoder)
 		{
-			float distTraveled = 0;
-
-			if (-1*inverted < 0) // going forward (decreasing encoder)
-				distTraveled = (initEncoder - nMotorEncoder[motorA])/TICK_TO_CM + offset;
-			else // going backward (increasing encoder)
-		{
-			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM + offset);
+			distTraveled = -((initEncoder - nMotorEncoder[motorA])/TICK_TO_CM);
 		}
 
 		(*robotPos).x += distTraveled;
 
+
+		float offset = SENSOR_OFFSET + sin(ULTRA_FOV*DEG_TO_RAD)*sensorDistance;
+		correctiveDrive(offset*inverted, &*robotPos);
 		rotateRobot(90);
 		//float objDist = sqrt (pow(sensorDistance, 2) - pow(offset, 2));
 		if (sensorDistance >TRI_OFFSET)
@@ -441,8 +434,6 @@ void correctiveDrive(int distance, Position *robotPos)
 
 	(*robotPos).x += cos((ANGLE)*DEG_TO_RAD)*-distance;
 	(*robotPos).y += sin((ANGLE)*DEG_TO_RAD)*-distance;
-	displayString(1, "X Pos: %d", (*robotPos).x);
-	displayString(2, "Y Pos: %d", (*robotPos).y);
 }
 
 
