@@ -91,6 +91,8 @@ task main()
   if (!initSensor(&muxedSensor[2], msensor_S1_3, typeMode[2]))
   	writeDebugStreamLine("initSensor() failed! for msensor_S1_3");
 
+  motor[MOTOR_LEFT]=motor[MOTOR_RIGHT]=motor[MOTOR_LIFT]=0;
+
 	// tracks position of robot=
 	Position robotPos;
 	robotPos.x = 0;
@@ -103,10 +105,6 @@ task main()
 	if (!getButtonPress(buttonEnter))
 	{
 		mainProgram(&robotPos);
-	}
-	if (getButtonPress(buttonEnter))
-	{
-		emergShutdown();
 	}
 }
 
@@ -211,7 +209,7 @@ void driveBoth(int pwrL, int pwrR)
 int rotateRobot(int angle)
 {
 	int startAngle = getGyroDegrees(GYRO_PORT);
-	const float KP = 0.26;//0.26
+	const float KP = 0.20;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.1;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT)-startAngle);
@@ -249,7 +247,7 @@ int rotateRobot(int angle)
 // Rotates the robot to an angle relative to the initial gyro zeroing when program starts, positive angles are clockwise when viewed from above
 int rotateAbsolute(int angle)
 {
-	const float KP = 0.26;//0.26
+	const float KP = 0.20;//0.26
 	const float KI = 0.001;//0.0008
 	const float KD = 0.1;//0.23
 	float error = angle - (getGyroDegrees(GYRO_PORT));//
@@ -290,6 +288,14 @@ float triangulate(Position *robotPos)
 
   const int REPS = 30;
 
+  bool triAFirst = false;
+  bool triCFirst = false;
+  if (triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
+		triAFirst = true;
+	if (triLengthC < ULTRA_INTERCEPT && triLengthA > ULTRA_INTERCEPT)
+		triCFirst = true;
+
+
  	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= REPS)//!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 20
  	{
   	avgTriLength = 0;
@@ -318,14 +324,28 @@ float triangulate(Position *robotPos)
 				float deltaGamma = (gammaInit - gammaFinal);
 				if(abs(deltaGamma) < 90)
 				{
-					rotateRobot(deltaGamma/ANGLE_CORRECTION);
+					rotateRobot(round(deltaGamma/ANGLE_CORRECTION));
 				}
 			}
 		}
 		else if ((triLengthA > ULTRA_INTERCEPT && triLengthC < ULTRA_INTERCEPT))
-			rotateRobot(-FIX_ANGLE);
+		{
+			if (triAFirst)
+			{
+				rotateRobot(FIX_ANGLE);
+				count = REPS;
+			}
+			else
+				rotateRobot(-FIX_ANGLE);
+		}
 		else if ((triLengthA < ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT))
-			rotateRobot(FIX_ANGLE);
+			if (triCFirst)
+			{
+				rotateRobot(-FIX_ANGLE);
+				count = REPS;
+			}
+			else
+				rotateRobot(FIX_ANGLE);
 		else if (triLengthA > ULTRA_INTERCEPT && triLengthC > ULTRA_INTERCEPT)
 			displayString(7, "both too long");
 		count++;
@@ -365,6 +385,7 @@ bool driveUltrasonic(float distance, Position *robotPos)
 	}
 
 	sensorDistance = getMuxSensorValue(SIDE_ULTRA_PORT)/10;
+	displayString(8, "Sensor Distance: %f", sensorDistance);
 	drive(0);
 	wait1Msec(1000);
 
@@ -521,7 +542,7 @@ void driveToPos(Position targetPos, Position *robotPos, int finalRotation, bool 
 	{
 		float angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
 
-		rotateAbsolute(180 + angle);
+		rotateAbsolute(round(180 + angle));
 		correctiveDrive( sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
 
 		if (rotate)
