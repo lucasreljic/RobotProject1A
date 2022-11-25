@@ -272,8 +272,12 @@ float triangulate(Position *robotPos)
   float rotatedOffset = 0;
   float avgTriLength = 0;
   float maxGammaTriLength = 0;
-
   const int REPS = 30;
+
+
+  displayString(1, "A: %f", triLengthA);
+  displayString(1, "C: %f", triLengthC);
+
 
  	while (!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= REPS)//!getButtonPress(buttonEnter) && triLengthA != avgTriLength && triLengthC != avgTriLength && count <= 20
  	{
@@ -318,6 +322,8 @@ float triangulate(Position *robotPos)
 			displayString(7, "both too long");
 		count++;
 	}
+
+
 	rotatedOffset = sqrt(pow(maxGammaTriLength, 2)-pow(TRI_LENGTH_B/2, 2));
 	//if (rotatedOffset < GRIP_LENGTH)
 		//return(0);
@@ -467,20 +473,24 @@ void liftPID(int distance)
 void driveToPos(Position targetPos, Position *robotPos, int finalRotation)
 {
 
-	rotateAbsolute(180);
-
-	float angle = 0;
-
 	Position posRelative;
 	posRelative.x = (*robotPos).x - targetPos.x;
 	posRelative.y = (*robotPos).y - targetPos.y;
 
-	angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
+	const float TOL = 1.0/10;
+	if ( fabs(posRelative.x - targetPos.x) <= TOL && fabs(posRelative.x - targetPos.x) <= TOL)
+	{
+		rotateAbsolute(finalRotation);
+	}
+	else
+	{
+		float angle = posRelative.x==0? 90 : atan2(posRelative.y, posRelative.x)*RAD_TO_DEG;
 
-	rotateRobot(angle);
-	correctiveDrive( sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
+		rotateAbsolute(180 + angle);
+		correctiveDrive( sqrt(pow(posRelative.x, 2) + pow(posRelative.y, 2)) , &*robotPos);
 
-	rotateAbsolute(finalRotation);
+		rotateAbsolute(finalRotation);
+	}
 }
 
 
