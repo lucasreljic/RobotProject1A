@@ -5,7 +5,6 @@
 
 #include "mindsensors-ev3smux.h"
 #include "EV3Servo-lib-UW.c"
-#include "EV3Multiplex.c"
 
 
 // class for position (x,y)
