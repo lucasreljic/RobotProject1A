@@ -10,7 +10,7 @@ Lucas Reljic-Dumont
 
 
 
-Robot pickup and return red/green/blue boxes
+Robot grabs and returns red/green/blue boxes from a 1m X 1m area to a designated location.
 
 Libraries for Sensor Multiplexer from:
 https://github.com/botbench/robotcdriversuite/tree/master/include
