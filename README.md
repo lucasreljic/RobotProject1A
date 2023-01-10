@@ -3,10 +3,12 @@ v1.11
 Repo for our Robotc code for Tron 1A final project
 
 Developers:
+Aidan Newman,
+Aishwin Varghese,
+Deven Patel,
 Lucas Reljic-Dumont
-Deven Patel
-Aishwin Varghese
-Aidan Newman
+
+
 
 Robot pickup and return red/green/blue boxes
 
